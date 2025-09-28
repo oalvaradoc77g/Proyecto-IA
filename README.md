@@ -54,4 +54,16 @@ The workspace includes the following key libraries:
 python src/hello_world.py
 ```
 
-This will display a greeting message in Spanish.
+2. Run Python Variables Examples:
+
+```powershell
+python src/python_variables.py
+```
+
+3. Run Practice 1 - Lists and Extractions:
+
+```powershell
+python src/practica1.py
+```
+
+This will show examples of different Python variable types, lists, and arrays with detailed documentation.
