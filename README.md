@@ -66,4 +66,10 @@ python src/python_variables.py
 python src/practica1.py
 ```
 
-This will show examples of different Python variable types, lists, and arrays with detailed documentation.
+4. Run Practice 2 - Strings and Lists:
+
+```powershell
+python src/practica2.py
+```
+
+This will show examples of different Python variable types, lists, and arrays with detailed documentation. And the second practice demonstrates working with strings containing numbers and text, as well as list operations.
