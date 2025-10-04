@@ -11,6 +11,7 @@ import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import warnings
 from modelo_series_temporales import ModeloSeriesTiempo
+from modelo_hibrido import ModeloHibrido
 
 warnings.filterwarnings('ignore')
 
@@ -265,6 +266,19 @@ def main():
     
     # Visualizar resultados
     modelo_temporal.visualizar_predicciones(df_temporal, predicciones)
+
+    print("\n🔄 ENTRENANDO MODELO HÍBRIDO")
+    modelo_hibrido = ModeloHibrido()
+    modelo_hibrido.entrenar(df)
+    
+    # Predicciones híbridas
+    predicciones_hibridas = modelo_hibrido.predecir(df, n_predicciones=6)
+    print("\n🔮 PREDICCIONES HÍBRIDAS:")
+    print(predicciones_hibridas)
+    
+    # Evaluar modelo híbrido
+    X_test = df.iloc[-2:]  # Usar últimos 2 meses como prueba
+    modelo_hibrido.evaluar(X_test)
 
 if __name__ == "__main__":
     main()
