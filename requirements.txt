@@ -6,3 +6,5 @@ seaborn
 openpyxl
 statsmodels
 prophet
+scipy
+joblib
