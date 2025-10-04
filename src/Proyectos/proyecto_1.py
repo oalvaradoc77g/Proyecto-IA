@@ -272,13 +272,23 @@ def main():
     modelo_hibrido.entrenar(df)
     
     # Predicciones híbridas
-    predicciones_hibridas = modelo_hibrido.predecir(df, n_predicciones=6)
-    print("\n🔮 PREDICCIONES HÍBRIDAS:")
-    print(predicciones_hibridas)
-    
-    # Evaluar modelo híbrido
-    X_test = df.iloc[-2:]  # Usar últimos 2 meses como prueba
-    modelo_hibrido.evaluar(X_test)
+    try:
+        # Primero evaluar con datos históricos
+        print("\n📊 EVALUACIÓN CON DATOS HISTÓRICOS:")
+        modelo_hibrido.evaluar(df)
+        
+        # Luego hacer predicciones futuras
+        print("\n🔮 PREDICCIONES FUTURAS:")
+        predicciones_hibridas = modelo_hibrido.predecir(
+            df_futuro=pd.DataFrame(),  # DataFrame vacío para predicciones futuras
+            n_predicciones=6,
+            retornar_componentes=True
+        )
+        if predicciones_hibridas is not None:
+            print(predicciones_hibridas.round(2))
+            
+    except Exception as e:
+        print(f"❌ Error en predicciones híbridas: {e}")
 
 if __name__ == "__main__":
     main()

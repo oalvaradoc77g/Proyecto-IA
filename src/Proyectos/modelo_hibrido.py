@@ -179,23 +179,18 @@ class ModeloHibrido:
             if 'capital' not in df_futuro.columns or 'gastos_fijos' not in df_futuro.columns:
                 raise ValueError("Datos futuros deben contener 'capital' y 'gastos_fijos'")
             
-            # Usar último punto para proyección (o lógica más sofisticada)
-            ultimo_punto = df_futuro[['capital', 'gastos_fijos']].iloc[-1:].values
-            
-            # Crear escenarios futuros (puedes personalizar esta lógica)
-            X_futuro = np.tile(ultimo_punto, (n_predicciones, 1))
-            
-            # Aplicar pequeña variación a los inputs futuros
-            variacion = np.random.normal(0, 0.02, X_futuro.shape)  # 2% de variación
-            X_futuro = X_futuro * (1 + variacion)
-            
-            X_futuro_scaled = self.scaler.transform(X_futuro)
+            # Preparar datos para predicción
+            X = df_futuro[['capital', 'gastos_fijos']].values
+            X_scaled = self.scaler.transform(X)
             
             # Predicción componente lineal
-            pred_lineal = self.modelo_lineal.predict(X_futuro_scaled)
+            pred_lineal = self.modelo_lineal.predict(X_scaled)
             
-            # Predicción residuos con intervalo de confianza
-            pred_arima = self.modelo_arima.get_forecast(n_predicciones)
+            # Si estamos prediciendo datos históricos, usar la longitud real
+            n_pred = len(df_futuro) if len(df_futuro) > 0 else n_predicciones
+            
+            # Predicción residuos
+            pred_arima = self.modelo_arima.get_forecast(n_pred)
             pred_residuos = pred_arima.predicted_mean
             ic_residuos = pred_arima.conf_int()
             
@@ -204,17 +199,18 @@ class ModeloHibrido:
             pred_inferior = pred_lineal + ic_residuos.iloc[:, 0]
             pred_superior = pred_lineal + ic_residuos.iloc[:, 1]
             
-            # Generar fechas futuras
-            if hasattr(df_futuro.index, 'freq'):
-                freq = df_futuro.index.freq
+            # Crear índice temporal adecuado
+            if len(df_futuro) > 0:
+                # Usar el índice existente para datos históricos
+                fechas = df_futuro.index
             else:
-                freq = 'M'
-                
-            fechas_futuras = pd.date_range(
-                start=df_futuro.index[-1] + pd.DateOffset(months=1),
-                periods=n_predicciones,
-                freq=freq
-            )
+                # Crear nuevo índice para predicciones futuras
+                ultima_fecha = pd.Timestamp.now()
+                fechas = pd.date_range(
+                    start=ultima_fecha,
+                    periods=n_predicciones,
+                    freq='M'
+                )
             
             # Crear DataFrame de resultados
             resultados = pd.DataFrame({
@@ -223,7 +219,11 @@ class ModeloHibrido:
                 'ic_superior': pred_superior,
                 'componente_lineal': pred_lineal,
                 'componente_arima': pred_residuos
-            }, index=fechas_futuras)
+            }, index=fechas)
+            
+            # Verificar que no hay NaN
+            if resultados['prediccion_hibrida'].isna().any():
+                print("⚠️ Advertencia: Algunas predicciones contienen NaN")
             
             if retornar_componentes:
                 return resultados

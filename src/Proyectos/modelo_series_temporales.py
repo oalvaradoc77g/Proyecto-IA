@@ -249,7 +249,7 @@ class ModeloSeriesTiempo:
         
         resultados = pd.DataFrame(index=fechas_futuras)
         
-        # Predicciones ARIMA (con reverse de diferenciación)
+        # Predicciones ARIMA
         if self.modelo_arima is not None:
             pred_diff = self.modelo_arima.get_forecast(
                 n_predicciones,
@@ -263,24 +263,35 @@ class ModeloSeriesTiempo:
                 pred_acumulada.append(pred_acumulada[-1] + diff_valor)
             
             resultados['ARIMA'] = pred_acumulada[1:]
+            resultados['ARIMA_Pesos'] = resultados['ARIMA'].apply(lambda x: f"${x:,.2f}")
             
             if intervalo_confianza:
                 intervalo = pred_diff.conf_int()
                 resultados['ARIMA_inferior'] = intervalo.iloc[:, 0] + ultimo_valor
                 resultados['ARIMA_superior'] = intervalo.iloc[:, 1] + ultimo_valor
+                resultados['Rango_Pesos'] = resultados.apply(
+                    lambda x: f"${x['ARIMA_inferior']:,.2f} - ${x['ARIMA_superior']:,.2f}", 
+                    axis=1
+                )
         
-        # Predicciones Prophet (solo si está habilitado)
+        # Predicciones Prophet (si está habilitado)
         if self.modelo_prophet is not None and self.usar_prophet:
             future_dates = pd.DataFrame({'ds': fechas_futuras})
             pred_prophet = self.modelo_prophet.predict(future_dates)
             resultados['Prophet'] = pred_prophet['yhat'].values
+            resultados['Prophet_Pesos'] = resultados['Prophet'].apply(lambda x: f"${x:,.2f}")
+            
             if intervalo_confianza:
                 resultados['Prophet_inferior'] = pred_prophet['yhat_lower'].values
                 resultados['Prophet_superior'] = pred_prophet['yhat_upper'].values
         
-        # Calcular promedio ponderado
-        if 'ARIMA' in resultados.columns and 'Prophet' in resultados.columns:
-            resultados['Promedio'] = (resultados['ARIMA'] + resultados['Prophet']) / 2
+        # Reordenar columnas para mejor visualización
+        columnas_ordenadas = [
+            'ARIMA', 'ARIMA_Pesos', 'ARIMA_inferior', 'ARIMA_superior', 'Rango_Pesos',
+            'Prophet', 'Prophet_Pesos'
+        ]
+        columnas_existentes = [col for col in columnas_ordenadas if col in resultados.columns]
+        resultados = resultados[columnas_existentes]
         
         return resultados
     
