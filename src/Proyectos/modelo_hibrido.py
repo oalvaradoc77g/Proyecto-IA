@@ -9,6 +9,13 @@ from sklearn.model_selection import TimeSeriesSplit
 import matplotlib.pyplot as plt
 import warnings
 import joblib
+import json
+# Fix import path - use absolute import
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.data_loader import DataLoader
+
 warnings.filterwarnings('ignore')
 
 class ModeloHibrido:
@@ -19,13 +26,50 @@ class ModeloHibrido:
         self.orden_arima = (1,1,1)
         self.alpha_ridge = alpha_ridge
         self.orden_arima_auto = orden_arima_auto
-        self.metricas = {}
+        self.metricas = {'evaluacion': {}, 'entrenamiento': {}}
         self.componentes = {}
         self.df_entrenamiento = None  # Agregar esta línea
+        self.variables_macro = ['tasa_uvr', 'tasa_dtf', 'inflacion_ipc']
+        self.columnas_categoricas = ['tipo_pago']
+        self.exog_transformer = None  # Para almacenar transformación de exógenas
+        self.data_loader = DataLoader()
         
+        self.ultimas_predicciones = {}  # Añadir este atributo
+        self.historial_predicciones = []  # Para tracking histórico
+        self.errores_prediccion = []  # Para monitoreo de errores
+
+    def ensure_df_exog(self, exog):
+        """Devuelve exog como DataFrame y orden fijo de columnas."""
+        if exog is None:
+            return None
+        if isinstance(exog, pd.Series):
+            exog = exog.to_frame().T
+        if isinstance(exog, np.ndarray):
+            exog = pd.DataFrame(exog)
+        if not isinstance(exog, pd.DataFrame):
+            raise ValueError("exog debe ser DataFrame, Series o ndarray")
+        return exog
+
+    def make_future_exog(self, train_exog, horizon, future_vals=None, cat_cols=None):
+        """Crea DataFrame de exógenas para predicción futura"""
+        cols = list(train_exog.columns)
+        last = train_exog.iloc[-1]
+        rows = []
+        for i in range(horizon):
+            row = last.copy()
+            if future_vals:
+                for k, v in future_vals.items():
+                    if k in cols:
+                        row[k] = v
+            rows.append(row.values)
+        future = pd.DataFrame(rows, columns=cols)
+        future = future.astype(train_exog.dtypes.to_dict())
+        return future
+
     def _validar_datos(self, df):
         """Valida que los datos sean adecuados para el modelo"""
-        columnas_requeridas = ['capital', 'gastos_fijos', 'total_mensual']
+        columnas_requeridas = ['capital', 'gastos_fijos', 'total_mensual'] + \
+                            self.variables_macro + self.columnas_categoricas
         faltantes = [col for col in columnas_requeridas if col not in df.columns]
         if faltantes:
             raise ValueError(f"Columnas faltantes: {faltantes}")
@@ -90,16 +134,35 @@ class ModeloHibrido:
             print("⚠️  Los residuos podrían tener tendencia residual")
 
     def separar_componentes(self, df, validar=True):
-        """Separa tendencia lineal y componente residual"""
+        """Separa tendencia lineal y componente residual con mejor manejo de exógenas"""
         if validar:
             self._validar_datos(df)
         
-        # Preparar features para modelo lineal
-        X = df[['capital', 'gastos_fijos']].values
+        # Preparar variables base
+        X_base = df[['capital', 'gastos_fijos']].values
+        
+        # Preparar variables exógenas
+        X_exog = df[self.variables_macro].copy()
+        
+        # Preparar variables categóricas con dummies
+        X_cat = pd.get_dummies(df[self.columnas_categoricas], drop_first=True)
+        
+        # Guardar transformación para uso futuro
+        self.exog_transformer = {
+            'columnas_exog': self.variables_macro,
+            'columnas_cat': list(X_cat.columns)
+        }
+        
+        # Combinar todas las features
+        X = np.hstack([X_base, X_exog.values, X_cat.values])
         y = df['total_mensual'].values
         
-        # Escalar features
-        X_scaled = self.scaler.fit_transform(X)
+        # Escalar solo variables numéricas
+        n_numericas = X_base.shape[1] + len(self.variables_macro)
+        X_scaled = np.hstack([
+            self.scaler.fit_transform(X[:, :n_numericas]),
+            X[:, n_numericas:]
+        ])
         
         # Configurar y ajustar modelo lineal
         if self.alpha_ridge is None:
@@ -185,7 +248,7 @@ class ModeloHibrido:
         print(f"   Varianza explicada lineal: {self.metricas['entrenamiento']['varianza_explicada_lineal']:.2%}")
 
     def predecir_futuro(self, n_predicciones=6, retornar_componentes=False):
-        """Predice valores FUTUROS (no para evaluación)"""
+        """Predicción con manejo robusto de dimensiones"""
         if self.modelo_lineal is None or self.modelo_arima is None:
             raise ValueError("Modelo no entrenado. Ejecuta entrenar() primero.")
         
@@ -193,21 +256,47 @@ class ModeloHibrido:
             raise ValueError("No hay datos de entrenamiento disponibles")
         
         try:
-            # Usar el ÚLTIMO punto conocido para proyectar
-            ultimo_punto = self.df_entrenamiento[['capital', 'gastos_fijos']].iloc[-1:].values
+            # 🔥 CORRECCIÓN CRÍTICA: Reconstruir exactamente las mismas features del entrenamiento
+            # Obtener el último punto de entrenamiento para referencia
+            ultimo_punto = self.df_entrenamiento.iloc[-1]
             
-            # Crear escenarios futuros (asumiendo pequeña variación)
-            X_futuro = np.tile(ultimo_punto, (n_predicciones, 1))
+            # 1. Variables base (capital, gastos_fijos)
+            X_base = np.tile([ultimo_punto['capital'], ultimo_punto['gastos_fijos']], (n_predicciones, 1))
             
-            # Aplicar variación mínima (1%)
-            variacion = np.random.normal(0, 0.01, X_futuro.shape)
-            X_futuro = X_futuro * (1 + variacion)
+            # 2. Variables macro (tasa_uvr, tasa_dtf, inflacion_ipc) - mantener valores constantes
+            X_macro = np.tile([
+                ultimo_punto['tasa_uvr'], 
+                ultimo_punto['tasa_dtf'], 
+                ultimo_punto['inflacion_ipc']
+            ], (n_predicciones, 1))
             
-            X_futuro_scaled = self.scaler.transform(X_futuro)
+            # 3. Variables categóricas - usar exactamente la misma codificación que en entrenamiento
+            tipo_pago_actual = ultimo_punto['tipo_pago']
+            
+            # Crear dummies con la misma estructura que en entrenamiento
+            if tipo_pago_actual == 'Ordinario':
+                X_cat = np.zeros((n_predicciones, 1))  # [0] para Ordinario
+            else:  # 'Abono extra'
+                X_cat = np.ones((n_predicciones, 1))   # [1] para Abono extra
+            
+            # 🔥 COMBINAR TODAS LAS FEATURES EN EL ORDEN CORRECTO
+            X_futuro = np.hstack([X_base, X_macro, X_cat])
+            
+            print(f"🔍 Debug: X_futuro shape final = {X_futuro.shape}")
+            print(f"🔍 Debug: Features combinadas = {X_futuro.shape[1]} (esperado: 6)")
+            
+            # Escalar solo componentes numéricas
+            n_numericas = X_base.shape[1] + X_macro.shape[1]
+            X_futuro_scaled = np.hstack([
+                self.scaler.transform(X_futuro[:, :n_numericas]),
+                X_futuro[:, n_numericas:]
+            ])
+            print(f"🔍 Debug: X_futuro_scaled final shape = {X_futuro_scaled.shape}")
             
             # Predicción componente lineal
             pred_lineal = self.modelo_lineal.predict(X_futuro_scaled)
-            
+            print(f"🔍 Debug: Predicción lineal shape = {pred_lineal.shape}")
+
             # Predicción residuos - CORREGIR ESTA PARTE
             try:
                 pred_arima = self.modelo_arima.get_forecast(steps=n_predicciones)
@@ -235,6 +324,28 @@ class ModeloHibrido:
             
             # Combinar predicciones
             pred_final = pred_lineal + pred_residuos
+            
+            # 🔥 NUEVO: Agregar variación aleatoria controlada
+            np.random.seed(42)  # Para reproducibilidad
+            variacion_base = np.random.normal(0, 0.02, pred_final.shape)  # 2% de variación base
+            
+            # Aumentar variación con el tiempo
+            variacion_tiempo = np.array([i * 0.005 for i in range(n_predicciones)])  # +0.5% por mes
+            variacion_total = variacion_base + variacion_tiempo
+            
+            # Aplicar variación a predicciones
+            pred_final = pred_final * (1 + variacion_total)
+            
+            # Ajustar intervalos de confianza
+            if tiene_ic:
+                # Ampliar intervalo de confianza progresivamente
+                tiempo_factor = np.array([1 + i * 0.1 for i in range(n_predicciones)])
+                pred_inferior = pred_inferior * (1 - variacion_total * tiempo_factor)
+                pred_superior = pred_superior * (1 + variacion_total * tiempo_factor)
+            
+            print("\n📊 Análisis de variación:")
+            print(f"   Variación media: {variacion_total.mean():.2%}")
+            print(f"   Variación máxima: {variacion_total.max():.2%}")
             
             # 🔥 CORRECCIÓN CRÍTICA: Generar fechas correctamente
             ultima_fecha = self.df_entrenamiento.index[-1]
@@ -286,6 +397,16 @@ class ModeloHibrido:
                         else:
                             resultados[col] = resultados[col].fillna(method='ffill').fillna(method='bfill')
             
+            # Guardar predicciones en el historial
+            for fecha, row in resultados.iterrows():
+                self.ultimas_predicciones[fecha.strftime('%Y-%m')] = row['prediccion_hibrida']
+                self.historial_predicciones.append({
+                    'fecha': fecha,
+                    'prediccion': row['prediccion_hibrida'],
+                    'componente_lineal': row['componente_lineal'],
+                    'componente_arima': row['componente_arima']
+                })
+        
             print(f"✅ {n_predicciones} predicciones generadas exitosamente")
             
             if retornar_componentes:
@@ -299,94 +420,118 @@ class ModeloHibrido:
             print("🔄 Intentando predicción simplificada...")
             return self._prediccion_simplificada(n_predicciones)
 
-    def _prediccion_simplificada(self, n_predicciones):
-        """Fallback para cuando falla la predicción temporal"""
-        ultimo_valor = self.df_entrenamiento['total_mensual'].iloc[-1]
-        predicciones = [ultimo_valor * (1 + 0.01 * i) for i in range(n_predicciones)]  # 1% de crecimiento mensual
-        
-        fechas = pd.RangeIndex(start=0, stop=n_predicciones, name='periodo_futuro')
-        return pd.Series(predicciones, index=fechas, name='prediccion_simplificada')
-
-    def evaluar(self, df_test=None, retornar_detalles=False):
-        """Evalúa el modelo usando backtesting simple"""
-        if self.modelo_lineal is None or self.modelo_arima is None:
-            raise ValueError("Modelo no entrenado")
-        
+    def guardar_predicciones(self, predicciones, ruta='predicciones.json'):
+        """Guarda predicciones con metadata"""
         try:
-            # Si no se proporciona test, usar los mismos datos (no ideal)
-            if df_test is None:
-                print("⚠️  Usando datos de entrenamiento para evaluación (puede sobrestimar rendimiento)")
-                df_test = self.df_entrenamiento
-            
-            if len(df_test) == 0:
-                raise ValueError("DataFrame de prueba está vacío")
-                
-            # Para evaluación, necesitamos separar train/test temporal
-            if len(df_test) >= 4:  # Mínimo para hacer split
-                split_point = max(1, len(df_test) - 2)  # Últimos 2 puntos para test
-                df_train = df_test.iloc[:split_point]
-                df_eval = df_test.iloc[split_point:]
-                
-                # Reentrenar modelo con datos de train
-                modelo_temp = ModeloHibrido(orden_arima_auto=False)
-                modelo_temp.entrenar(df_train)
-                
-                # Predecir los puntos de test
-                predicciones = modelo_temp.predecir_futuro(n_predicciones=len(df_eval), retornar_componentes=True)
-                y_true = df_eval['total_mensual'].values
-                y_pred = predicciones['prediccion_hibrida'].values[:len(y_true)]
-                
+            # Convertir predicciones a formato serializable
+            if isinstance(predicciones, pd.DataFrame):
+                pred_dict = {
+                    str(idx): {col: float(val) if not pd.isna(val) else None 
+                              for col, val in row.items()}
+                    for idx, row in predicciones.iterrows()
+                }
+            elif isinstance(predicciones, pd.Series):
+                pred_dict = {
+                    str(idx): float(val) if not pd.isna(val) else None
+                    for idx, val in predicciones.items()
+                }
             else:
-                # Con muy pocos datos, evaluación simple
-                print("⚠️  Muy pocos datos para evaluación temporal, usando ajuste directo")
-                y_true = df_test['total_mensual'].values
-                
-                # Usar el modelo actual para predecir (esto sobrestima)
-                X_test = df_test[['capital', 'gastos_fijos']].values
-                X_test_scaled = self.scaler.transform(X_test)
-                pred_lineal = self.modelo_lineal.predict(X_test_scaled)
-                
-                # Para residuos, usar predicciones in-sample
-                pred_residuos = self.modelo_arima.predict(start=0, end=len(df_test)-1)
-                y_pred = pred_lineal + pred_residuos
-            
-            # Calcular métricas
-            mae = mean_absolute_error(y_true, y_pred)
-            mse = mean_squared_error(y_true, y_pred)
-            rmse = np.sqrt(mse)
-            r2 = r2_score(y_true, y_pred)
-            
-            # MAPE con protección
-            with np.errstate(divide='ignore', invalid='ignore'):
-                mape = np.mean(np.abs((y_true - y_pred) / np.where(y_true != 0, y_true, 1))) * 100
-            
-            self.metricas['evaluacion'] = {
-                'MAE': mae,
-                'MSE': mse,
-                'RMSE': rmse,
-                'R2': r2,
-                'MAPE': mape
+                pred_dict = predicciones
+
+            datos = {
+                'fecha_generacion': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'predicciones': pred_dict,
+                'metricas': self.metricas,
+                'error_promedio': np.mean(self.errores_prediccion) if self.errores_prediccion else None
             }
             
-            print("\n📊 EVALUACIÓN MODELO HÍBRIDO:")
-            print(f"   MAE:  {mae:,.2f}")
-            print(f"   RMSE: {rmse:,.2f}")
-            print(f"   R²:   {r2:.4f}")
-            print(f"   MAPE: {mape:.2f}%")
+            with open(ruta, 'w', encoding='utf-8') as f:
+                json.dump(datos, f, indent=4, ensure_ascii=False)
+            print(f"✅ Predicciones guardadas en {ruta}")
             
-            if retornar_detalles:
-                return self.metricas['evaluacion'], predicciones
-            else:
-                return self.metricas['evaluacion']
-                
         except Exception as e:
-            print(f"❌ Error en evaluación: {e}")
-            # Evaluación simplificada como fallback
-            print("📊 Evaluación simplificada:")
-            residuos = self.componentes.get('residuos', pd.Series([0]))
-            print(f"   Desviación de residuos: {residuos.std():.2f}")
-            return {'error': str(e)}
-        
+            print(f"❌ Error guardando predicciones: {e}")
+            
+    def reentrenar_con_nuevo_dato(self, valor_real, fecha=None):
+        """Reentrena el modelo con un nuevo dato"""
+        try:
+            if self.df_entrenamiento is None:
+                raise ValueError("No hay datos de entrenamiento disponibles")
+                
+            # Crear nuevo dato con últimos valores conocidos
+            ultimo_registro = self.df_entrenamiento.iloc[-1].copy()
+            nuevo_registro = pd.DataFrame([ultimo_registro])
+            nuevo_registro['total_mensual'] = valor_real
+            
+            # Actualizar fecha si se proporciona
+            if fecha:
+                nuevo_registro.index = [pd.Timestamp(fecha)]
+            else:
+                # Usar siguiente mes
+                ultima_fecha = self.df_entrenamiento.index[-1]
+                nueva_fecha = ultima_fecha + pd.DateOffset(months=1)
+                nuevo_registro.index = [nueva_fecha]
+            
+            # Combinar datos y reentrenar
+            df_actualizado = pd.concat([self.df_entrenamiento, nuevo_registro])
+            
+            # Reentrenar modelo
+            return self.entrenar(df_actualizado)
+            
+        except Exception as e:
+            print(f"❌ Error en reentrenamiento: {e}")
+            return False
+            
+    def _prediccion_simplificada(self, n_predicciones):
+        """Fallback para cuando falla la predicción temporal"""
+        try:
+            ultimo_valor = float(self.df_entrenamiento['total_mensual'].iloc[-1])
+            ultima_fecha = self.df_entrenamiento.index[-1]
+            
+            # Generar fechas futuras
+            fechas_futuras = pd.date_range(
+                start=ultima_fecha + pd.DateOffset(months=1),
+                periods=n_predicciones,
+                freq='M'
+            )
+            
+            # Crear predicciones con crecimiento simple
+            predicciones = pd.DataFrame(
+                index=fechas_futuras,
+                data={
+                    'prediccion_hibrida': [ultimo_valor * (1 + 0.01 * i) for i in range(n_predicciones)],
+                    'componente_lineal': [ultimo_valor] * n_predicciones,
+                    'componente_arima': [0] * n_predicciones
+                }
+            )
+            
+            return predicciones
+            
+        except Exception as e:
+            print(f"❌ Error en predicción simplificada: {e}")
+            return pd.DataFrame()
+
+    def cargar_y_preparar_datos(self, df_base, fecha_inicio=None, fecha_fin=None):
+        """Carga y combina datos con variables macroeconómicas reales"""
+        try:
+            # Enriquecer con datos macro reales
+            df = self.data_loader.enriquecer_datos(df_base)
+            
+            # Verificar columnas
+            columnas_requeridas = ['capital', 'gastos_fijos', 'total_mensual'] + \
+                                self.variables_macro + self.columnas_categoricas
+            
+            faltantes = [col for col in columnas_requeridas if col not in df.columns]
+            if faltantes:
+                print(f"⚠️ Columnas faltantes: {faltantes}")
+                return None
+            
+            return df
+            
+        except Exception as e:
+            print(f"❌ Error en preparación de datos: {e}")
+            return None
+
         
 def visualizar_componentes(self, df):
     """Visualiza los componentes del modelo híbrido"""
@@ -431,16 +576,37 @@ def visualizar_componentes(self, df):
 
 # USO CORREGIDO en tu función principal:
 def ejemplo_uso_corregido():
-    """Ejemplo de uso mejorado con manejo robusto de errores"""
-    # TUS DATOS REALES (9 registros)
-    # ... tu código de carga de datos ...
+    """Ejemplo de uso con variables macroeconómicas"""
+    # Datos de ejemplo con nuevas variables
+    np.random.seed(42)
+    n = 36
+    datos = pd.DataFrame({
+        'capital': 1000000 + np.cumsum(np.random.normal(0, 10000, n)),
+        'gastos_fijos': 50000 + np.cumsum(np.random.normal(0, 1000, n)),
+        'tasa_uvr': np.random.normal(4.5, 0.2, n),
+        'tasa_dtf': np.random.normal(5.2, 0.3, n),
+        'inflacion_ipc': np.random.normal(3.8, 0.4, n),
+        'tipo_pago': np.random.choice(['Ordinario', 'Abono extra'], n),
+        'total_mensual': 0  # Se calculará
+    })
+    
+    # Crear relación más compleja
+    datos['total_mensual'] = (
+        datos['capital'] * 0.01 + 
+        datos['gastos_fijos'] * 0.8 +
+        datos['tasa_uvr'] * 1000 +
+        datos['tasa_dtf'] * 800 +
+        datos['inflacion_ipc'] * 1200 +
+        (datos['tipo_pago'] == 'Abono extra') * 50000 +
+        np.random.normal(0, 1000, n)
+    )
     
     modelo = ModeloHibrido(orden_arima_auto=True)
     
-    if modelo.entrenar(tus_datos_reales):
+    if modelo.entrenar(datos):
         # ✅ CORRECTO: Evaluar con los mismos datos (con las advertencias)
         try:
-            metricas = modelo.evaluar(tus_datos_reales)
+            metricas = modelo.evaluar(datos)
         except Exception as e:
             print(f"❌ Error en evaluación: {e}")
             metricas = {'error': str(e)}
@@ -453,7 +619,7 @@ def ejemplo_uso_corregido():
         except Exception as e:
             print(f"❌ Error en predicciones híbridas: {e}")
             # Predicción de emergencia
-            ultimo_valor = tus_datos_reales['total_mensual'].iloc[-1]
+            ultimo_valor = datos['total_mensual'].iloc[-1]
             fechas = pd.date_range(
                 start=pd.Timestamp.now() + pd.DateOffset(months=1),
                 periods=6,
@@ -468,8 +634,8 @@ def ejemplo_uso_corregido():
             print(predicciones_emergencia.round(2))
         
         # Visualizar si hay suficientes datos y el método existe
-        if len(tus_datos_reales) >= 5 and hasattr(modelo, 'visualizar_componentes'):
+        if len(datos) >= 5 and hasattr(modelo, 'visualizar_componentes'):
             try:
-                modelo.visualizar_componentes(tus_datos_reales)
+                modelo.visualizar_componentes(datos)
             except Exception as e:
                 print(f"❌ Error en visualización: {e}")

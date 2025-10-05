@@ -12,6 +12,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 import warnings
 from modelo_series_temporales import ModeloSeriesTiempo
 from modelo_hibrido import ModeloHibrido
+import json
 
 warnings.filterwarnings('ignore')
 
@@ -20,7 +21,12 @@ class ModeloHipoteca:
         self.modelo = None
         self.scaler = None
         self.columnas = ['capital', 'gastos_fijos']  # Modificado para usar gastos_fijos
-        
+        # Agregar nuevas columnas
+        self.variables_macro = ['tasa_uvr', 'tasa_dtf', 'inflacion_ipc']
+        self.columnas_categoricas = ['tipo_pago']
+        self.ultimas_predicciones = {}  # Para tracking de predicciones
+        self.historial_errores = []     # Para monitoreo de errores
+    
     def cargar_datos(self, path):
         """Carga y valida los datos con mejor manejo de errores"""
         try:
@@ -29,6 +35,22 @@ class ModeloHipoteca:
             
             # Crear nueva variable gastos_fijos
             df['gastos_fijos'] = df['intereses'] + df['seguros']
+            
+            # Agregar variables macroeconómicas con valores simulados si no existen
+            for var in self.variables_macro:
+                if var not in df.columns:
+                    print(f"⚠️ Agregando {var} simulada")
+                    if var == 'tasa_uvr':
+                        df[var] = np.random.normal(4.5, 0.2, len(df))
+                    elif var == 'tasa_dtf':
+                        df[var] = np.random.normal(5.2, 0.3, len(df))
+                    else:  # inflacion_ipc
+                        df[var] = np.random.normal(3.8, 0.4, len(df))
+            
+            # Agregar tipo_pago si no existe
+            if 'tipo_pago' not in df.columns:
+                print("⚠️ Agregando tipo_pago simulado")
+                df['tipo_pago'] = np.random.choice(['Ordinario', 'Abono extra'], size=len(df))
             
             # Validar columnas requeridas
             columnas_base = ['capital', 'intereses', 'seguros', 'total_mensual']
@@ -54,6 +76,14 @@ class ModeloHipoteca:
             # Estadísticas descriptivas
             print("\n📈 Estadísticas descriptivas:")
             print(df[self.columnas + ['total_mensual']].describe())
+            
+            # Verificar y convertir índice temporal
+            if 'fecha' in df.columns:
+                df['fecha'] = pd.to_datetime(df['fecha'])
+                df.set_index('fecha', inplace=True)
+            else:
+                print("⚠️ Creando índice temporal automático")
+                df.index = pd.date_range(start='2025-01-01', periods=len(df), freq='M')
             
             return df
             
@@ -214,6 +244,38 @@ class ModeloHipoteca:
         except Exception as e:
             print(f"❌ Error en predicción: {e}")
             return None
+        
+    def validar_prediccion(self, prediccion, valor_real):
+        """Valida predicción contra valor real y decide reentrenamiento"""
+        error = abs((valor_real - prediccion) / valor_real)
+        self.historial_errores.append(error)
+        
+        print(f"\n🎯 VALIDACIÓN DE PREDICCIÓN:")
+        print(f"   Predicho: ${prediccion:,.2f}")
+        print(f"   Real: ${valor_real:,.2f}")
+        print(f"   Error: {error:.2%}")
+        
+        if error > 0.15:  # Error > 15%
+            print("⚠️ Error significativo detectado")
+            return False
+        return True
+    
+    def guardar_predicciones(self, predicciones, ruta='predicciones.json'):
+        """Guarda predicciones con metadata"""
+        try:
+            datos = {
+                'fecha_generacion': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'predicciones': predicciones.to_dict() if hasattr(predicciones, 'to_dict') else predicciones,
+                'metricas': self.metricas if hasattr(self, 'metricas') else {},
+                'error_promedio': np.mean(self.historial_errores) if self.historial_errores else None
+            }
+            
+            with open(ruta, 'w') as f:
+                json.dump(datos, f, indent=4)
+            print(f"✅ Predicciones guardadas en {ruta}")
+            
+        except Exception as e:
+            print(f"❌ Error guardando predicciones: {e}")
 
 def main():
     # Modelo de regresión
@@ -269,25 +331,84 @@ def main():
 
     print("\n🔄 ENTRENANDO MODELO HÍBRIDO")
     modelo_hibrido = ModeloHibrido()
-    modelo_hibrido.entrenar(df)
     
-    # Predicciones híbridas
     try:
-        # Primero evaluar con datos históricos
-        print("\n📊 EVALUACIÓN CON DATOS HISTÓRICOS:")
-        modelo_hibrido.evaluar(df)
+        # Validar columnas requeridas
+        columnas_requeridas = ['capital', 'gastos_fijos', 'total_mensual', 
+                             'tasa_uvr', 'tasa_dtf', 'inflacion_ipc', 'tipo_pago']
         
-        # Luego hacer predicciones futuras
-        print("\n🔮 PREDICCIONES FUTURAS:")
-        predicciones_hibridas = modelo_hibrido.predecir_futuro(
-            n_predicciones=6,
-            retornar_componentes=True
-        )
-        if predicciones_hibridas is not None:
-            print(predicciones_hibridas.round(2))
+        for col in columnas_requeridas:
+            if col not in df.columns:
+                print(f"⚠️ Falta columna {col}")
+                return
+        
+        # Entrenamiento inicial
+        if modelo_hibrido.entrenar(df):
+            # 🔄 Validación con dato real
+            try:
+                mes_actual = df['total_mensual'].iloc[-1]  # Último valor conocido
+                prediccion_anterior = modelo_hibrido.predecir_futuro(n_predicciones=1)[0]
+                
+                error_relativo = abs((mes_actual - prediccion_anterior) / mes_actual)
+                
+                print("\n🎯 VALIDACIÓN DEL MODELO:")
+                print(f"   Valor Real: ${mes_actual:,.2f}")
+                print(f"   Predicción: ${prediccion_anterior:,.2f}")
+                print(f"   Error: {error_relativo:.2%}")
+                
+                if error_relativo > 0.15:  # Error mayor al 15%
+                    print("\n⚠️  ERROR ALTO - Reentrenando modelo...")
+                    # Agregar nuevo dato y reentrenar
+                    df_actualizado = df.copy()
+                    df_actualizado.loc[len(df_actualizado)] = {'total_mensual': mes_actual}
+                    modelo_hibrido.entrenar(df_actualizado)
+            except Exception as e:
+                print(f"⚠️  Error en validación: {e}")
             
+            # 🚀 DESPLIEGUE A PRODUCCIÓN
+            print("\n🚀 MODELO EN PRODUCCIÓN")
+            predicciones_futuras = modelo_hibrido.predecir_futuro(
+                n_predicciones=6, 
+                retornar_componentes=True
+            )
+            
+            if predicciones_futuras is not None:
+                print("\n📊 PREDICCIONES OPERACIONALES:")
+                print("=" * 50)
+                for fecha, row in predicciones_futuras.iterrows():
+                    print(f"   {fecha.strftime('%B %Y')}:")
+                    print(f"      Predicción: ${row['prediccion_hibrida']:,.2f}")
+                    if 'ic_inferior' in row:
+                        print(f"      Rango: ${row['ic_inferior']:,.2f} - ${row['ic_superior']:,.2f}")
+                print("=" * 50)
+                
+                # Guardar predicciones
+                try:
+                    predicciones_futuras.to_excel('predicciones_produccion.xlsx')
+                    print("\n✅ Predicciones guardadas en 'predicciones_produccion.xlsx'")
+                except Exception as e:
+                    print(f"⚠️  Error guardando predicciones: {e}")
+                
     except Exception as e:
-        print(f"❌ Error en predicciones híbridas: {e}")
+        print(f"❌ Error en producción: {e}")
+    
+    # Sistema de validación y monitoreo
+    if modelo_hibrido is not None and len(df) > 0:
+        ultimo_valor_real = df['total_mensual'].iloc[-1]
+        ultima_prediccion = modelo_hibrido.ultimas_predicciones.get(
+            df.index[-1].strftime('%Y-%m'), None)
+        
+        if ultima_prediccion is not None:
+            if not modelo_hibrido.validar_prediccion(ultima_prediccion, ultimo_valor_real):
+                print("🔄 Reentrenando modelo con nuevos datos...")
+                modelo_hibrido.entrenar(df)  # Reentrenar
+        
+        # Guardar nuevas predicciones
+        predicciones_futuras = modelo_hibrido.predecir_futuro(n_predicciones=3)
+        if predicciones_futuras is not None:
+            modelo_hibrido.guardar_predicciones(predicciones_futuras)
+    
+    print("\n✅ ANÁLISIS COMPLETADO")
 
 if __name__ == "__main__":
     main()

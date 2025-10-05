@@ -8,3 +8,4 @@ statsmodels
 prophet
 scipy
 joblib
+requests  # Added for API calls
