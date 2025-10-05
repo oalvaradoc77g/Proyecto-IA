@@ -357,21 +357,26 @@ class ModeloSeriesTiempo:
         
         print(f"\n📈 RESUMEN HISTÓRICO:")
         print(f"   Período analizado: {len(df)} meses")
-        print(f"   Promedio histórico: {df['total_mensual'].mean():.2f}")
-        print(f"   Tendencia: {'↗️ Alza' if df['total_mensual'].iloc[-1] > df['total_mensual'].iloc[0] else '↘️ Baja'}")
+        print(f"   Promedio histórico: ${df['total_mensual'].mean():,.2f}")
+        ultimo_valor = df['total_mensual'].iloc[-1]
+        print(f"   Último valor: ${ultimo_valor:,.2f}")
+        
+        cambio = ((ultimo_valor - df['total_mensual'].iloc[0]) / df['total_mensual'].iloc[0]) * 100
+        print(f"   Tendencia: {'↗️ Alza' if cambio > 0 else '↘️ Baja'} ({cambio:+.1f}%)")
         
         print(f"\n🔮 PREDICCIONES ({len(predicciones)} meses):")
         for modelo in ['ARIMA', 'Prophet', 'Promedio']:
             if modelo in predicciones.columns:
                 promedio_pred = predicciones[modelo].mean()
-                cambio_porcentual = ((promedio_pred - df['total_mensual'].mean()) / df['total_mensual'].mean()) * 100
-                print(f"   {modelo:<8}: {promedio_pred:>8.2f} ({cambio_porcentual:+.1f}%)")
+                cambio_porcentual = ((promedio_pred - ultimo_valor) / ultimo_valor) * 100
+                print(f"   {modelo:<8}: ${promedio_pred:>12,.2f} ({cambio_porcentual:+.1f}%)")
         
         print(f"\n💡 RECOMENDACIONES:")
-        if 'Promedio' in predicciones.columns:
-            tendencia = "estable" if abs(predicciones['Promedio'].pct_change().mean()) < 0.01 else "cambiante"
-            print(f"   • Tendencia proyectada: {tendencia}")
-            print(f"   • Prepare flujo de caja para promedios de {predicciones['Promedio'].mean():.2f}")
+        if 'ARIMA' in predicciones.columns:
+            valor_min = predicciones['ARIMA_inferior'].min()
+            valor_max = predicciones['ARIMA_superior'].max()
+            print(f"   • Rango esperado: ${valor_min:,.2f} - ${valor_max:,.2f}")
+            print(f"   • Prepare flujo de caja para ${predicciones['ARIMA'].mean():,.2f} mensuales")
         
         print("="*60)
 

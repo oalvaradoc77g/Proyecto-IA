@@ -279,8 +279,7 @@ def main():
         
         # Luego hacer predicciones futuras
         print("\n🔮 PREDICCIONES FUTURAS:")
-        predicciones_hibridas = modelo_hibrido.predecir(
-            df_futuro=pd.DataFrame(),  # DataFrame vacío para predicciones futuras
+        predicciones_hibridas = modelo_hibrido.predecir_futuro(
             n_predicciones=6,
             retornar_componentes=True
         )
