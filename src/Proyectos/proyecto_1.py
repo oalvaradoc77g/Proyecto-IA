@@ -1,3 +1,9 @@
+import sys
+import os
+# Add src directory to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, TimeSeriesSplit, cross_val_score
@@ -10,8 +16,9 @@ import seaborn as sns
 import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 import warnings
-from modelo_series_temporales import ModeloSeriesTiempo
-from modelo_hibrido import ModeloHibrido
+from core.modelo_hibrido import ModeloHibrido
+from core.modelo_series_temporales import ModeloSeriesTiempo
+
 import json
 
 warnings.filterwarnings('ignore')

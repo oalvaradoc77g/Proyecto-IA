@@ -420,38 +420,62 @@ class ModeloHibrido:
             print("🔄 Intentando predicción simplificada...")
             return self._prediccion_simplificada(n_predicciones)
 
-    def guardar_predicciones(self, predicciones, ruta='predicciones.json'):
-        """Guarda predicciones con metadata"""
-        try:
-            # Convertir predicciones a formato serializable
-            if isinstance(predicciones, pd.DataFrame):
-                pred_dict = {
-                    str(idx): {col: float(val) if not pd.isna(val) else None 
-                              for col, val in row.items()}
-                    for idx, row in predicciones.iterrows()
-                }
-            elif isinstance(predicciones, pd.Series):
-                pred_dict = {
-                    str(idx): float(val) if not pd.isna(val) else None
-                    for idx, val in predicciones.items()
-                }
-            else:
-                pred_dict = predicciones
+    def _crear_directorio_mes(self):
+        """Crea estructura de directorios para el mes actual"""
+        import os
+        from datetime import datetime
+        
+        # Crear estructura base
+        base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 
+                               'data', 'predictions')
+        
+        # Obtener año y mes actual
+        now = datetime.now()
+        year_dir = os.path.join(base_dir, str(now.year))
+        month_dir = os.path.join(year_dir, now.strftime('%B').lower())
+        
+        # Crear directorios si no existen
+        os.makedirs(month_dir, exist_ok=True)
+        
+        return month_dir
 
+    def guardar_predicciones(self, predicciones, nombre_base='predicciones'):
+        """Guarda predicciones con metadata en directorio mensual"""
+        try:
+            # Obtener directorio del mes
+            dir_mes = self._crear_directorio_mes()
+            
+            # Generar nombres de archivo con timestamp
+            timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+            json_path = os.path.join(dir_mes, f'{nombre_base}_{timestamp}.json')
+            excel_path = os.path.join(dir_mes, f'{nombre_base}_{timestamp}.xlsx')
+            
+            # Guardar JSON
             datos = {
                 'fecha_generacion': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'predicciones': pred_dict,
+                'predicciones': self._convertir_predicciones_dict(predicciones),
                 'metricas': self.metricas,
                 'error_promedio': np.mean(self.errores_prediccion) if self.errores_prediccion else None
             }
             
-            with open(ruta, 'w', encoding='utf-8') as f:
+            with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump(datos, f, indent=4, ensure_ascii=False)
-            print(f"✅ Predicciones guardadas en {ruta}")
+                
+            # Guardar Excel
+            if isinstance(predicciones, (pd.DataFrame, pd.Series)):
+                predicciones.to_excel(excel_path)
+                
+            print(f"✅ Archivos guardados en {dir_mes}:")
+            print(f"   📄 {os.path.basename(json_path)}")
+            print(f"   📊 {os.path.basename(excel_path)}")
             
+            # Crear resumen del mes si no existe
+            self._actualizar_resumen_mes(dir_mes, datos)
+                
         except Exception as e:
             print(f"❌ Error guardando predicciones: {e}")
             
+     
     def reentrenar_con_nuevo_dato(self, valor_real, fecha=None):
         """Reentrena el modelo con un nuevo dato"""
         try:
@@ -480,8 +504,54 @@ class ModeloHibrido:
             
         except Exception as e:
             print(f"❌ Error en reentrenamiento: {e}")
-            return False
+            return False        
             
+
+    def _convertir_predicciones_dict(self, predicciones):
+        """Convierte predicciones a formato serializable"""
+        if isinstance(predicciones, pd.DataFrame):
+            return {
+                str(idx): {col: float(val) if not pd.isna(val) else None 
+                          for col, val in row.items()}
+                for idx, row in predicciones.iterrows()
+            }
+        elif isinstance(predicciones, pd.Series):
+            return {
+                str(idx): float(val) if not pd.isna(val) else None
+                for idx, val in predicciones.items()
+            }
+        return predicciones
+
+    def _actualizar_resumen_mes(self, dir_mes, datos_nuevos):
+        """Mantiene un resumen del mes con todas las predicciones"""
+        resumen_path = os.path.join(dir_mes, 'resumen_mes.json')
+        
+        try:
+            if os.path.exists(resumen_path):
+                with open(resumen_path, 'r', encoding='utf-8') as f:
+                    resumen = json.load(f)
+            else:
+                resumen = {
+                    'predicciones_realizadas': 0,
+                    'ultima_actualizacion': None,
+                    'historico': []
+                }
+            
+            # Actualizar resumen
+            resumen['predicciones_realizadas'] += 1
+            resumen['ultima_actualizacion'] = datos_nuevos['fecha_generacion']
+            resumen['historico'].append({
+                'fecha_generacion': datos_nuevos['fecha_generacion'],
+                'error_promedio': datos_nuevos['error_promedio'],
+                'metricas': datos_nuevos['metricas'].get('evaluacion', {})
+            })
+            
+            with open(resumen_path, 'w', encoding='utf-8') as f:
+                json.dump(resumen, f, indent=4, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"⚠️ Error actualizando resumen del mes: {e}")
+
     def _prediccion_simplificada(self, n_predicciones):
         """Fallback para cuando falla la predicción temporal"""
         try:

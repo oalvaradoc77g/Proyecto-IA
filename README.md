@@ -73,3 +73,7 @@ python src/practica2.py
 ```
 
 This will show examples of different Python variable types, lists, and arrays with detailed documentation. And the second practice demonstrates working with strings containing numbers and text, as well as list operations.
+
+# Proyecto de Predicción de Hipotecas
+
+## Estructura del Proyecto
