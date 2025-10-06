@@ -1,4 +1,8 @@
-from modelo_hibrido import ModeloHibrido
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.modelo_hibrido import ModeloHibrido
 import pandas as pd
 
 def main():

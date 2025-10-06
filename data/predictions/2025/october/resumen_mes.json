@@ -1,0 +1,11 @@
+{
+    "predicciones_realizadas": 1,
+    "ultima_actualizacion": "2025-10-06 12:04:23",
+    "historico": [
+        {
+            "fecha_generacion": "2025-10-06 12:04:23",
+            "error_promedio": null,
+            "metricas": {}
+        }
+    ]
+}
