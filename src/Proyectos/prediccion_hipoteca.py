@@ -18,6 +18,7 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 import warnings
 from core.modelo_hibrido import ModeloHibrido
 from core.modelo_series_temporales import ModeloSeriesTiempo
+from utils.data_loader import DataLoader
 
 import json
 
@@ -33,6 +34,7 @@ class ModeloHipoteca:
         self.columnas_categoricas = ['tipo_pago']
         self.ultimas_predicciones = {}  # Para tracking de predicciones
         self.historial_errores = []     # Para monitoreo de errores
+        self.data_loader = DataLoader()  # Add DataLoader instance
     
     def cargar_datos(self, path):
         """Carga y valida los datos con mejor manejo de errores"""
@@ -43,46 +45,14 @@ class ModeloHipoteca:
             # Crear nueva variable gastos_fijos
             df['gastos_fijos'] = df['intereses'] + df['seguros']
             
-            # Agregar variables macroeconómicas con valores simulados si no existen
-            for var in self.variables_macro:
-                if var not in df.columns:
-                    print(f"⚠️ Agregando {var} simulada")
-                    if var == 'tasa_uvr':
-                        df[var] = np.random.normal(4.5, 0.2, len(df))
-                    elif var == 'tasa_dtf':
-                        df[var] = np.random.normal(5.2, 0.3, len(df))
-                    else:  # inflacion_ipc
-                        df[var] = np.random.normal(3.8, 0.4, len(df))
-            
             # Agregar tipo_pago si no existe
             if 'tipo_pago' not in df.columns:
-                print("⚠️ Agregando tipo_pago simulado")
-                df['tipo_pago'] = np.random.choice(['Ordinario', 'Abono extra'], size=len(df))
-            
-            # Validar columnas requeridas
-            columnas_base = ['capital', 'intereses', 'seguros', 'total_mensual']
-            faltantes = [col for col in columnas_base if col not in df.columns]
-            if faltantes:
-                raise ValueError(f"Columnas faltantes: {faltantes}")
-            
-            # Convertir a numérico
-            for col in columnas_base:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            # Estadísticas antes de limpiar
-            print("🔍 Valores nulos por columna:")
-            print(df[self.columnas + ['total_mensual']].isnull().sum())
-            
-            # Eliminar nulos
-            filas_originales = len(df)
-            df = df.dropna(subset=self.columnas + ['total_mensual']).reset_index(drop=True)
-            filas_eliminadas = filas_originales - len(df)
-            if filas_eliminadas > 0:
-                print(f"⚠️  Se eliminaron {filas_eliminadas} registros con valores nulos")
-                
-            # Estadísticas descriptivas
-            print("\n📈 Estadísticas descriptivas:")
-            print(df[self.columnas + ['total_mensual']].describe())
+                print("ℹ️ Agregando columna tipo_pago")
+                # Calcular umbral usando Series en lugar de acceder directamente
+                capital_medio = df['capital'].mean()
+                df['tipo_pago'] = df['capital'].apply(
+                    lambda x: 'Abono extra' if x > capital_medio * 1.2 else 'Ordinario'
+                )
             
             # Verificar y convertir índice temporal
             if 'fecha' in df.columns:
@@ -92,7 +62,23 @@ class ModeloHipoteca:
                 print("⚠️ Creando índice temporal automático")
                 df.index = pd.date_range(start='2025-01-01', periods=len(df), freq='M')
             
-            return df
+            # Enriquecer con datos macroeconómicos simulados
+            print("🔄 Agregando variables macroeconómicas simuladas...")
+            df_enriquecido = self.data_loader.enriquecer_datos(df)
+            
+            # Asegurar que todas las columnas necesarias existen
+            columnas_requeridas = ['capital', 'gastos_fijos', 'total_mensual', 'tipo_pago'] + \
+                                ['tasa_uvr', 'tasa_dtf', 'inflacion_ipc']
+                                
+            for col in columnas_requeridas:
+                if col not in df_enriquecido.columns:
+                    print(f"⚠️ Agregando columna faltante: {col}")
+                    if col in self.data_loader.valores_actuales:
+                        df_enriquecido[col] = self.data_loader.valores_actuales[col]
+                    elif col == 'tipo_pago':
+                        df_enriquecido[col] = 'Ordinario'  # valor por defecto
+            
+            return df_enriquecido
             
         except Exception as e:
             print(f"❌ Error cargando datos: {e}")

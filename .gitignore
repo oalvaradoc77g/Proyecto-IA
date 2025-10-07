@@ -1,0 +1,46 @@
+# Archivos de extractos bancarios y datos sensibles
+*extracto*.csv
+*extracto*.xlsx
+*extracto*.xls
+*hipoteca*.csv
+*hipoteca*.xlsx
+*hipoteca*.xls
+*.pdf
+
+# Carpetas de datos
+data/raw/*
+data/processed/*
+data/predictions/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/predictions/.gitkeep
+
+# Ambiente virtual de Python
+venv/
+env/
+.env
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Archivos de IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Logs y outputs
+*.log
+output/
+logs/
+
+# Archivos temporales
+*.tmp
+*~

@@ -9,3 +9,6 @@ prophet
 scipy
 joblib
 requests  # Added for API calls
+plotly>=5.18.0
+nbformat>=5.9.2
+beautifulsoup4>=4.9.3

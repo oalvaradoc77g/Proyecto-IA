@@ -1,9 +1,74 @@
 {
-    "predicciones_realizadas": 1,
-    "ultima_actualizacion": "2025-10-06 12:04:23",
+    "predicciones_realizadas": 14,
+    "ultima_actualizacion": "2025-10-07 12:01:29",
     "historico": [
         {
             "fecha_generacion": "2025-10-06 12:04:23",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 14:45:21",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 14:48:14",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 16:34:45",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 16:38:53",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 17:01:24",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 17:55:58",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-06 17:59:00",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-07 08:11:23",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-07 08:19:25",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-07 08:28:24",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-07 11:02:47",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-07 11:07:51",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-07 12:01:29",
             "error_promedio": null,
             "metricas": {}
         }

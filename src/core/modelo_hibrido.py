@@ -15,6 +15,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_loader import DataLoader
+import plotly.graph_objects as go
+import plotly.express as px
+from plotly.subplots import make_subplots
 
 warnings.filterwarnings('ignore')
 
@@ -709,3 +712,53 @@ def ejemplo_uso_corregido():
                 modelo.visualizar_componentes(datos)
             except Exception as e:
                 print(f"❌ Error en visualización: {e}")
+
+def visualizar_predicciones(self, df_historico, predicciones, titulo="Proyección de Cuotas Hipotecarias"):
+    """Visualización mejorada con Plotly"""
+    fig = go.Figure()
+    
+    # Datos históricos
+    fig.add_trace(go.Scatter(
+        x=df_historico.index, 
+        y=df_historico['total_mensual'],
+        name='Histórico',
+        line=dict(color='blue', width=2)
+    ))
+    
+    # Predicciones
+    fig.add_trace(go.Scatter(
+        x=predicciones.index,
+        y=predicciones['prediccion_hibrida'],
+        name='Predicción',
+        line=dict(color='red', dash='dash')
+    ))
+    
+    # Intervalo de confianza si existe
+    if 'ic_inferior' in predicciones.columns:
+        fig.add_trace(go.Scatter(
+            x=predicciones.index,
+            y=predicciones['ic_superior'],
+            fill=None,
+            mode='lines',
+            line=dict(color='rgba(255,0,0,0)'),
+            showlegend=False
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=predicciones.index,
+            y=predicciones['ic_inferior'],
+            fill='tonexty',
+            mode='lines',
+            line=dict(color='rgba(255,0,0,0)'),
+            name='Intervalo de Confianza'
+        ))
+    
+    fig.update_layout(
+        title=titulo,
+        xaxis_title='Fecha',
+        yaxis_title='Total Mensual',
+        hovermode='x unified',
+        template='plotly_white'
+    )
+    
+    fig.show()
