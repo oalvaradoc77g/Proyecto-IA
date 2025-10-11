@@ -82,8 +82,8 @@ def main():
     - Muestra los resultados de cada ronda
     """
     # Crear jugadores con diferentes estrategias
-    jugador1 = Jugador("Cooperador", "cooperar")  # Este jugador siempre cooperará
-    jugador2 = Jugador("Tit for Tat", "tit_for_tat")  # Este jugador imitará la última jugada del oponente
+    jugador1 = Jugador("Tomas", "cooperar")  # Este jugador siempre cooperará
+    jugador2 = Jugador("Manuel", "tit_for_tat")  # Este jugador imitará la última jugada del oponente
     
     # Crear juego
     juego = DilemaDelPrisionero(jugador1, jugador2)
