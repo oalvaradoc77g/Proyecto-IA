@@ -36,6 +36,28 @@ print(df.groupby('Carrera')['Edad'].mean().sort_values(ascending=False))
 print("\nCantidad de Estudiantes por Carrera:")
 print(df['Carrera'].value_counts())
 
+
+# 3. Calculo de las estadistricas descriptivas de variable promedio
+print("\n=== Estadísticas Descriptivas de Promedio ===")
+print(f"Media: {df['Promedio'].mean():.2f}")
+print(f"Mediana: {df['Promedio'].median():.2f}")
+print(f"Moda: {df['Promedio'].mode()[0]:.2f}")
+print(f"Desviación Estándar: {df['Promedio'].std():.2f}")
+print(f"Varianza: {df['Promedio'].var():.2f}")
+print(f"Rango: {df['Promedio'].max() - df['Promedio'].min():.2f}")
+print(f"Coeficiente de Variación: {(df['Promedio'].std() / df['Promedio'].mean() * 100):.2f}%")
+print(f"Skewness: {df['Promedio'].skew():.2f}")
+print(f"Kurtosis: {df['Promedio'].kurt():.2f}")
+print(f"Percentiles (25%, 50%, 75%): {df['Promedio'].quantile([0.25, 0.5, 0.75]).values}")
+print(f"Valores Atípicos (IQR):")
+Q1 = df['Promedio'].quantile(0.25)
+Q2 = df['Promedio'].quantile(0.50)
+Q3 = df['Promedio'].quantile(0.75)
+IQR = Q3 - Q1
+outliers = df[(df['Promedio'] < (Q1 - 1.5 * IQR)) | (df['Promedio'] > (Q3 + 1.5 * IQR))]
+print(outliers)
+
+
 # 3. Visualizaciones
 plt.figure(figsize=(12, 8))
 
