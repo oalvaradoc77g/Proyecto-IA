@@ -1,0 +1,22 @@
+{
+    "fecha_generacion": "2025-10-07 12:01:29",
+    "predicciones": {
+        "2025-10-01 00:00:00": 9255921.002451137,
+        "2025-11-01 00:00:00": 9255921.002451137,
+        "2025-12-01 00:00:00": 9255921.002451137
+    },
+    "metricas": {
+        "evaluacion": {},
+        "entrenamiento": {
+            "alpha_ridge": 0.00206913808111479,
+            "orden_arima": [
+                0,
+                1,
+                1
+            ],
+            "aic_arima": 165.34676881850208,
+            "varianza_explicada_lineal": 0.9999979399658866
+        }
+    },
+    "error_promedio": null
+}
