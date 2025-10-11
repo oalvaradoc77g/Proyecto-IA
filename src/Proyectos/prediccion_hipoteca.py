@@ -1,15 +1,22 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import RidgeCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
-import matplotlib.pyplot as plt
-import seaborn as sns
 import warnings
+warnings.filterwarnings("ignore")
 
-warnings.filterwarnings('ignore')
+import os
+import joblib
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import optuna
+
+from sklearn.model_selection import train_test_split, TimeSeriesSplit
+from sklearn.linear_model import RidgeCV, Ridge  # Added RidgeCV import
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from lightgbm import LGBMRegressor
+
+RANDOM_STATE = 42
 
 class ModeloFinanciero:
     def __init__(self):
@@ -138,6 +145,25 @@ class ModeloFinanciero:
             print(f"❌ Error en predicción: {e}")
             return None
 
+def optimize_lgbm(trial, X_train, y_train, X_test, y_test):
+    """Función objetivo para Optuna"""
+    params = {
+        'n_estimators': trial.suggest_int('n_estimators', 100, 2000),
+        'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.3),
+        'num_leaves': trial.suggest_int('num_leaves', 7, 63),
+        'min_child_samples': trial.suggest_int('min_child_samples', 5, 30),
+        'max_depth': trial.suggest_int('max_depth', 3, 8),
+        'colsample_bytree': trial.suggest_float('colsample_bytree', 0.5, 1.0),
+        'subsample': trial.suggest_float('subsample', 0.5, 1.0),
+        'random_state': RANDOM_STATE
+    }
+    
+    model = LGBMRegressor(**params)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+    return rmse
+
 def main():
     """Función principal optimizada para análisis financiero"""
     # Cargar datos
@@ -157,10 +183,10 @@ def main():
         def convert_date(date_str):
             try:
                 month, day = date_str.split()[:2]
-                return f"2023-{month_dict.get(month, '01')}-{day.zfill(2)}"
+                return f"2025-{month_dict.get(month, '01')}-{day.zfill(2)}"
             except:
-                return f"2023-01-01"
-        
+                return f"2025-01-01"
+
         df['Fecha'] = df['Fecha'].apply(convert_date)
         df['Fecha'] = pd.to_datetime(df['Fecha'])
         
