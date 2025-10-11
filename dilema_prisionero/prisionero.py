@@ -17,7 +17,7 @@ class Jugador:
         - cooperar: siempre coopera
         - traicionar: siempre traiciona
         - aleatorio: decide al azar
-        - tit_for_tat: imita la última jugada del oponente
+        - ojo_por_ojo: imita la última jugada del oponente
         """
         if self.estrategia == "cooperar":
             return True
@@ -25,7 +25,7 @@ class Jugador:
             return False
         elif self.estrategia == "aleatorio":
             return random.choice([True, False])
-        elif self.estrategia == "tit_for_tat":
+        elif self.estrategia == "ojo_por_ojo":
             if not historial_oponente:
                 return True
             return historial_oponente[-1]
@@ -83,11 +83,14 @@ def main():
     """
     # Crear jugadores con diferentes estrategias
     jugador1 = Jugador("Tomas", "cooperar")  # Este jugador siempre cooperará
-    jugador2 = Jugador("Manuel", "tit_for_tat")  # Este jugador imitará la última jugada del oponente
+    jugador2 = Jugador("Manuel", "ojo_por_ojo")  # Este jugador imitará la última jugada del oponente
+    jugador3 = Jugador("Ricardo", "aleatorio")  # Este jugador decidirá al azar 
     
     # Crear juego
-    juego = DilemaDelPrisionero(jugador1, jugador2)
-    
+    #juego = DilemaDelPrisionero(jugador1, jugador2)
+    juego = DilemaDelPrisionero(jugador1, jugador3)
+    #juego = DilemaDelPrisionero(jugador2, jugador3)
+
     # Jugar 10 rondas
     for ronda in range(10):
         decision1, decision2 = juego.jugar_ronda()
