@@ -271,137 +271,78 @@ class ModeloHipoteca:
             print(f"❌ Error guardando predicciones: {e}")
 
 def main():
-    # Modelo de regresión
-    modelo_hipoteca = ModeloHipoteca()
-    
+    """Función principal para análisis de movimientos financieros"""
     # Cargar datos
-    path = r'C:\Users\omaroalvaradoc\Documents\Personal\hipoteca_extractos_ene_sep_2025.xlsx'
-    df = modelo_hipoteca.cargar_datos(path)
-    
-    if df is None or len(df) == 0:
-        print("No se pudieron cargar los datos")
-        return
-    
-    # Análisis exploratorio
-    vif = modelo_hipoteca.analizar_multicolinealidad(df)
-    
-    # Preparar y entrenar modelo
-    X_train, X_test, y_train, y_test = modelo_hipoteca.preparar_datos(df, temporal=True)
-    modelo = modelo_hipoteca.crear_modelo(X_train, y_train)
-    
-    # Evaluar
-    y_pred, metricas = modelo_hipoteca.evaluar_modelo(modelo, X_test, y_test)
-    
-    # Gráficos
-    residuos = modelo_hipoteca.crear_graficos(df, y_test, y_pred, X_test)
-    
-    # Predicción para octubre
-    # Tomamos los últimos valores conocidos del dataset
-    ultimo_registro = df.iloc[-1]
-    capital_octubre = ultimo_registro['capital']
-    gastos_fijos_octubre = ultimo_registro['gastos_fijos']
-    
-    print("\n🗓️ PREDICCIÓN PARA OCTUBRE:")
-    print("Usando los últimos valores conocidos:")
-    modelo_hipoteca.predecir(capital_octubre, gastos_fijos_octubre, 0)  # El tercer parámetro ya no se usa
-
-    # Modelo de series temporales
-    print("\n⏰ MODELOS DE SERIES TEMPORALES")
-    modelo_temporal = ModeloSeriesTiempo()
-    df_temporal = modelo_temporal.preparar_datos(df)
-    
-    # Entrenar modelos
-    modelo_temporal.entrenar_arima(df_temporal)
-    modelo_temporal.entrenar_prophet(df_temporal)
-    
-    # Realizar predicciones
-    predicciones = modelo_temporal.predecir_proximas_cuotas(df_temporal)
-    print("\n🔮 PREDICCIONES PARA LOS PRÓXIMOS 6 MESES:")
-    print(predicciones)
-    
-    # Visualizar resultados
-    modelo_temporal.visualizar_predicciones(df_temporal, predicciones)
-
-    print("\n🔄 ENTRENANDO MODELO HÍBRIDO")
-    modelo_hibrido = ModeloHibrido()
-    
+    path = 'data/processed/Datos Movimientos Financieros Ajustados.csv'
     try:
-        # Validar columnas requeridas
-        columnas_requeridas = ['capital', 'gastos_fijos', 'total_mensual', 
-                             'tasa_uvr', 'tasa_dtf', 'inflacion_ipc', 'tipo_pago']
+        df = pd.read_csv(path)
+        print(f"📊 Datos cargados: {len(df)} registros")
         
-        for col in columnas_requeridas:
-            if col not in df.columns:
-                print(f"⚠️ Falta columna {col}")
-                return
+        # Preparar datos
+        def convert_date(date_str):
+            month_dict = {
+                'ENE': '01', 'FEB': '02', 'MAR': '03', 'ABR': '04',
+                'MAY': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08',
+                'SEP': '09', 'OCT': '10', 'NOV': '11', 'DIC': '12'
+            }
+            month, day = date_str.split()
+            return f"2023-{month_dict[month]}-{day.zfill(2)}"
+
+        # Convertir fechas y valores numéricos
+        df['Fecha'] = df['Fecha'].apply(convert_date)
+        df['Fecha'] = pd.to_datetime(df['Fecha'])
         
-        # Entrenamiento inicial
-        if modelo_hibrido.entrenar(df):
-            # 🔄 Validación con dato real
-            try:
-                mes_actual = df['total_mensual'].iloc[-1]  # Último valor conocido
-                prediccion_anterior = modelo_hibrido.predecir_futuro(n_predicciones=1)[0]
-                
-                error_relativo = abs((mes_actual - prediccion_anterior) / mes_actual)
-                
-                print("\n🎯 VALIDACIÓN DEL MODELO:")
-                print(f"   Valor Real: ${mes_actual:,.2f}")
-                print(f"   Predicción: ${prediccion_anterior:,.2f}")
-                print(f"   Error: {error_relativo:.2%}")
-                
-                if error_relativo > 0.15:  # Error mayor al 15%
-                    print("\n⚠️  ERROR ALTO - Reentrenando modelo...")
-                    # Agregar nuevo dato y reentrenar
-                    df_actualizado = df.copy()
-                    df_actualizado.loc[len(df_actualizado)] = {'total_mensual': mes_actual}
-                    modelo_hibrido.entrenar(df_actualizado)
-            except Exception as e:
-                print(f"⚠️  Error en validación: {e}")
-            
-            # 🚀 DESPLIEGUE A PRODUCCIÓN
-            print("\n🚀 MODELO EN PRODUCCIÓN")
-            predicciones_futuras = modelo_hibrido.predecir_futuro(
-                n_predicciones=6, 
-                retornar_componentes=True
-            )
-            
-            if predicciones_futuras is not None:
-                print("\n📊 PREDICCIONES OPERACIONALES:")
-                print("=" * 50)
-                for fecha, row in predicciones_futuras.iterrows():
-                    print(f"   {fecha.strftime('%B %Y')}:")
-                    print(f"      Predicción: ${row['prediccion_hibrida']:,.2f}")
-                    if 'ic_inferior' in row:
-                        print(f"      Rango: ${row['ic_inferior']:,.2f} - ${row['ic_superior']:,.2f}")
-                print("=" * 50)
-                
-                # Guardar predicciones
-                try:
-                    predicciones_futuras.to_excel('predicciones_produccion.xlsx')
-                    print("\n✅ Predicciones guardadas en 'predicciones_produccion.xlsx'")
-                except Exception as e:
-                    print(f"⚠️  Error guardando predicciones: {e}")
-                
+        def clean_numeric(x):
+            if isinstance(x, str):
+                return float(x.replace(',', '').replace('"', ''))
+            return float(x) if pd.notnull(x) else 0.0
+
+        df['Débitos'] = df['Débitos'].apply(clean_numeric)
+        df['Créditos'] = df['Créditos'].apply(clean_numeric)
+        df['Saldo'] = df['Saldo'].apply(clean_numeric)
+
+        # Agrupar por mes
+        df_mensual = df.groupby(df['Fecha'].dt.to_period('M')).agg({
+            'Débitos': 'sum',
+            'Créditos': 'sum',
+            'Saldo': 'last',
+            'Lugar': lambda x: x.value_counts().index[0]  # Lugar más frecuente
+        }).reset_index()
+
+        # Preparar datos para el modelo (versión simplificada)
+        datos_modelo = pd.DataFrame({
+            'fecha': df_mensual['Fecha'].dt.to_timestamp(),
+            'total_mensual': df_mensual['Débitos'],
+            'capital': df_mensual['Saldo'],
+            'gastos_fijos': df_mensual['Débitos'] - df_mensual['Créditos'],
+            'lugar_frecuente': df_mensual['Lugar']
+        })
+
+        # Análisis básico
+        print("\n📊 ANÁLISIS DE GASTOS MENSUALES:")
+        print(f"Promedio de gastos: ${datos_modelo['total_mensual'].mean():,.2f}")
+        print(f"Máximo gasto mensual: ${datos_modelo['total_mensual'].max():,.2f}")
+        print(f"Mínimo gasto mensual: ${datos_modelo['total_mensual'].min():,.2f}")
+
+        # Análisis por categoría
+        print("\n🏷️ TOP 5 LUGARES DE GASTO:")
+        top_lugares = df.groupby('Lugar')['Débitos'].sum().sort_values(ascending=False).head()
+        for lugar, monto in top_lugares.items():
+            print(f"   {lugar}: ${monto:,.2f}")
+
+        # Tendencia de gastos
+        plt.figure(figsize=(12, 6))
+        plt.plot(datos_modelo['fecha'], datos_modelo['total_mensual'], 'b-', marker='o')
+        plt.title('Tendencia de Gastos Mensuales')
+        plt.xlabel('Fecha')
+        plt.ylabel('Total Gastos ($)')
+        plt.grid(True)
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
+
     except Exception as e:
-        print(f"❌ Error en producción: {e}")
-    
-    # Sistema de validación y monitoreo
-    if modelo_hibrido is not None and len(df) > 0:
-        ultimo_valor_real = df['total_mensual'].iloc[-1]
-        ultima_prediccion = modelo_hibrido.ultimas_predicciones.get(
-            df.index[-1].strftime('%Y-%m'), None)
-        
-        if ultima_prediccion is not None:
-            if not modelo_hibrido.validar_prediccion(ultima_prediccion, ultimo_valor_real):
-                print("🔄 Reentrenando modelo con nuevos datos...")
-                modelo_hibrido.entrenar(df)  # Reentrenar
-        
-        # Guardar nuevas predicciones
-        predicciones_futuras = modelo_hibrido.predecir_futuro(n_predicciones=3)
-        if predicciones_futuras is not None:
-            modelo_hibrido.guardar_predicciones(predicciones_futuras)
-    
-    print("\n✅ ANÁLISIS COMPLETADO")
+        print(f"❌ Error en el procesamiento: {e}")
 
 if __name__ == "__main__":
     main()
