@@ -57,6 +57,18 @@ IQR = Q3 - Q1
 outliers = df[(df['Promedio'] < (Q1 - 1.5 * IQR)) | (df['Promedio'] > (Q3 + 1.5 * IQR))]
 print(outliers)
 
+# Filtro y extraccion de datos
+filtered_df = df[(df['Edad'] > 20) & (df['Promedio'] > 8)]
+print(f"\nEstudiantes con Edad > 20 y Promedio > 8: {len(filtered_df)}")
+print(filtered_df)  
+
+# Manipulación de datos: Añadir columna de Aprobación
+df['Aprobado'] = np.where(df['Promedio'] >= 8, 'Sí', 'No')
+print("\n=== DataFrame con Columna de Aprobación ===")
+
+print(df.head())
+
+
 
 # 3. Visualizaciones
 plt.figure(figsize=(12, 8))
