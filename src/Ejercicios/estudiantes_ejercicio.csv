@@ -1,0 +1,9 @@
+Nombre,Edad,Carrera,Promedio,Promedio_10,Promedio_100,Aprobado
+Ana,23,Matemáticas,8.5,8.5,85,True
+Luis,25,Física,9.1,9.1,91,True
+María,22,Química,7.8,7.8,78,False
+Carlos,30,Biología,8.9,8.9,89,True
+Sofía,27,Ingeniería,9.3,9.3,93,True
+Jorge,24,Historia,7.5,7.5,75,False
+Lucía,21,Arte,8.0,8.0,80,True
+Pedro,29,Economía,8.7,8.7,87,True

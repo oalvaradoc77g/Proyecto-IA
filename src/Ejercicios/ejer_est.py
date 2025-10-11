@@ -3,8 +3,65 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Leer el archivo CSV usando ruta relativa
-df = pd.read_csv('src/Ejercicios/estudiantes_original.csv')
+# 1. Cargar y verificar el archivo
+df = pd.read_csv('src/Ejercicios/estudiantes_ejercicio.csv')
+print("\n=== Verificación de columnas nuevas ===")
+print("Columnas en el DataFrame:", df.columns.tolist())
+print("\nPrimeras filas con nuevas columnas:")
+print(df.head())
+
+# 2. Análisis de Promedio_10
+print("\n=== Análisis de Promedio_10 ===")
+media_p10 = df['Promedio_10'].mean()
+mediana_p10 = df['Promedio_10'].median()
+moda_p10 = df['Promedio_10'].mode()[0]
+
+print(f"""
+Medidas de tendencia central para Promedio_10:
+- Media: {media_p10:.2f} (promedio general de la clase)
+- Mediana: {mediana_p10:.2f} (valor central que divide la clase en dos partes iguales)
+- Moda: {moda_p10:.2f} (calificación más frecuente)
+""")
+
+# 3. Filtrar estudiantes aprobados
+print("\n=== Estudiantes Aprobados ===")
+aprobados = df[df['Aprobado'] == True]['Nombre'].tolist()
+print("Lista de estudiantes aprobados:")
+for nombre in aprobados:
+    print(f"- {nombre}")
+
+# 4. Carrera con mayor promedio
+promedios_carrera = df.groupby('Carrera')['Promedio'].agg(['mean', 'count']).round(2)
+mejor_carrera = promedios_carrera.loc[promedios_carrera['mean'].idxmax()]
+
+print(f"""
+\n=== Análisis por Carrera ===
+Promedios por carrera:
+{promedios_carrera}
+
+Carrera con mejor desempeño:
+- Carrera: {promedios_carrera['mean'].idxmax()}
+- Promedio: {mejor_carrera['mean']}
+- Cantidad de estudiantes: {mejor_carrera['count']}
+""")
+
+# 5. Crear columna Diferencia
+df['Diferencia'] = df['Promedio_100'] - (df['Edad'] * 2)
+print("\n=== Análisis de Diferencia ===")
+print("Nueva columna 'Diferencia' creada:")
+print(df[['Nombre', 'Edad', 'Promedio_100', 'Diferencia']].head())
+print("\nInterpretación: La diferencia muestra qué tan por encima o por debajo")
+print("está el rendimiento (Promedio_100) respecto al doble de la edad del estudiante.")
+
+# 6. Guardar subconjunto en nuevo CSV
+columnas_seleccionadas = ['Nombre', 'Carrera', 'Promedio_10', 'Aprobado']
+df_subset = df[columnas_seleccionadas]
+output_path = 'src/Ejercicios/estudiantes_subset.csv'
+df_subset.to_csv(output_path, index=False)
+print(f"\n=== Archivo guardado ===")
+print(f"Se ha guardado el subconjunto en: {output_path}")
+print("Contenido del nuevo archivo:")
+print(df_subset)
 
 # 1. Análisis Estadístico Básico
 print("\n=== Estadísticas Descriptivas ===")
@@ -23,7 +80,7 @@ print("\n=== Valores Nulos por Columna ===")
 print(df.isnull().sum())
 
 print("\n=== Dimensiones del DataFrame ===")
-print(df.shape())
+print(df.shape)
 
 # 2. Análisis por Carrera
 print("\n=== Análisis por Carrera ===")
