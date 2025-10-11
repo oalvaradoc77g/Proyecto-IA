@@ -68,6 +68,25 @@ print("\n=== DataFrame con Columna de Aprobación ===")
 
 print(df.head())
 
+# Seleccion datos con Ioc e iloc
+print("\n=== Selección de Datos con loc e iloc ===")    
+print("\nUsando loc (filas 0-4, columnas 'Nombre' y 'Promedio'):")
+print(df.loc[0:4, ['Nombre', 'Promedio']])
+print("\nUsando iloc (filas 0-4, columnas 0 y 2):")
+print(df.iloc[0:4, [0, 2]])
+print("\nUsando iloc (todas las filas, columnas 1 a 3):")
+print(df.iloc[:, 1:4])  
+
+#Agrupacion y agregacion
+print("\n=== Agrupación y Agregación ===")  
+grouped = df.groupby('Carrera').agg({
+    'Promedio': ['mean', 'max', 'min'],
+    'Edad': 'mean',
+    'Nombre': 'count'
+}).rename(columns={'Nombre': 'Cantidad de Estudiantes'})
+print(grouped)
+
+
 
 
 # 3. Visualizaciones
