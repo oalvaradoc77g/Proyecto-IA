@@ -1,12 +1,29 @@
 import pandas as pd
 import numpy as np
+import os
+from pathlib import Path
 
 # 1. Cargar el fichero de excel "dataset_bigdata" y nombrarlo "df_practica5"
 print("=" * 80)
 print("📂 PRÁCTICA 5: Análisis de Dataset BigData")
 print("=" * 80)
 
-df_practica5 = pd.read_excel("src/Ejercicios/dataset_bigdata.xlsx", engine='openpyxl')
+# Detectar el directorio raíz del proyecto (funciona en terminal y ventana interactiva)
+try:
+    # Si se ejecuta como script
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent.parent
+except NameError:
+    # Si se ejecuta en ventana interactiva, buscar el directorio raíz
+    project_root = Path.cwd()
+    # Verificar si estamos en el directorio raíz buscando el archivo requirements.txt
+    while not (project_root / "requirements.txt").exists() and project_root.parent != project_root:
+        project_root = project_root.parent
+
+dataset_path = project_root / "src" / "Ejercicios" / "dataset_bigdata.xlsx"
+print(f"📁 Ruta del dataset: {dataset_path}")
+
+df_practica5 = pd.read_excel(dataset_path, engine='openpyxl')
 print(f"\n✅ Dataset cargado exitosamente: {len(df_practica5)} registros")
 print("\n📊 Primeras filas del dataset:")
 print(df_practica5.head())
@@ -149,7 +166,7 @@ else:
     print("⚠️ No hay datos para mostrar en el resumen")
 
 # Guardar resultados en CSV
-output_path = 'src/Practicas/practica5_resultados.csv'
+output_path = project_root / 'src' / 'Practicas' / 'practica5_resultados.csv'
 resultado.to_csv(output_path)
 print(f"\n💾 Resultados guardados en: {output_path}")
 
