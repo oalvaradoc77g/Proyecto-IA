@@ -16,7 +16,7 @@ def analizar_categorias(df):
         'Vivienda': ['FIRENZE', 'CONJUNTO', 'ACUEDUCTO', 'ENEL', 'CLARO', 'ETB', 'VANTI'],
         'Servicios Financieros': ['PAGO PRESTAMO', 'TRANSFEREN', 'TRASLADO', 'BANCO'],
         'Salud': ['DROGUERIA', 'FARMA', 'COMPENSAR'],
-        'Entretenimiento': ['NEQUI', 'DAVIPLATA', 'BOLD'],
+        'Moneda Digital': ['NEQUI', 'DAVIPLATA'],
         'Educación': ['MATRICULA', 'PROFESIONAL'],
         'Otros': []
     }
