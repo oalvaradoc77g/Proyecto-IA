@@ -8,6 +8,38 @@ warnings.filterwarnings("ignore")
 
 import sys
 import os
+
+# Verificar dependencias antes de importar
+def verificar_dependencias():
+    """Verifica que todas las dependencias estén instaladas"""
+    dependencias = {
+        'pandas': 'pandas',
+        'numpy': 'numpy',
+        'matplotlib': 'matplotlib',
+        'scipy': 'scipy',
+        'plotly': 'plotly'
+    }
+    
+    faltantes = []
+    for nombre, paquete in dependencias.items():
+        try:
+            __import__(paquete)
+        except ImportError:
+            faltantes.append(nombre)
+    
+    if faltantes:
+        print("❌ Faltan las siguientes dependencias:")
+        for dep in faltantes:
+            print(f"   - {dep}")
+        print("\n💡 Ejecuta uno de estos comandos para instalar:")
+        print("   python install_dependencies.py")
+        print("   pip install -r requirements.txt")
+        print(f"   pip install {' '.join(faltantes)}")
+        sys.exit(1)
+
+# Verificar dependencias
+verificar_dependencias()
+
 import pandas as pd
 import numpy as np
 

@@ -1,15 +1,26 @@
-# 📊 Proyecto de Análisis Financiero con IA
+# 📊 Análisis Financiero Personal con IA
 
-Proyecto de predicción y análisis de movimientos financieros utilizando Machine Learning e inteligencia artificial.
+Sistema completo de análisis de movimientos financieros con visualizaciones interactivas y proyecciones.
 
-## 🎯 Objetivo
+## 🚀 Instalación Rápida
 
-Analizar movimientos financieros personales para:
+### Opción 1: Instalación Automática
 
-- Identificar tendencias de gastos e ingresos
-- Categorizar y visualizar patrones de consumo
-- Generar predicciones de gastos futuros
-- Proporcionar recomendaciones de ahorro
+```bash
+python install_dependencies.py
+```
+
+### Opción 2: Instalación Manual
+
+```bash
+pip install -r requirements.txt
+```
+
+### Opción 3: Instalación Individual
+
+```bash
+pip install pandas numpy matplotlib scikit-learn scipy openpyxl seaborn plotly kaleido
+```
 
 ## 📁 Estructura del Proyecto
 
@@ -43,28 +54,6 @@ CURSO_IA/
 │
 └── ejercicios/                       # Ejercicios del curso (separados)
     └── dataset_bigdata.xlsx
-```
-
-## 🚀 Instalación
-
-1. **Clonar el repositorio**
-
-```powershell
-git clone https://github.com/oalvaradoc77g/Proyecto-IA.git
-cd "CURSO IA"
-```
-
-2. **Crear entorno virtual**
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate
-```
-
-3. **Instalar dependencias**
-
-```powershell
-pip install -r requirements.txt
 ```
 
 ## 💻 Uso
