@@ -1,22 +1,115 @@
 import warnings
 warnings.filterwarnings("ignore")
 
+import sys
 import os
-import joblib
-import numpy as np
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import optuna
 
-from sklearn.model_selection import train_test_split, TimeSeriesSplit
-from sklearn.linear_model import RidgeCV, Ridge  # Added RidgeCV import
+# Agregar el directorio base al PYTHONPATH
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+# Importar la función de ejemplo_uso
+try:
+    from examples.ejemplo_uso import main as ejemplo_uso_main
+except ImportError:
+    print("⚠️ No se pudo importar ejemplo_uso, continuando sin él...")
+    ejemplo_uso_main = None
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from lightgbm import LGBMRegressor
 
 RANDOM_STATE = 42
+
+def analizar_tendencias(df):
+    """Análisis detallado de tendencias financieras"""
+    # Asegurar que la fecha está en formato datetime
+    df['Fecha'] = pd.to_datetime(df['Fecha'])
+    
+    # Análisis mensual
+    df_mensual = df.groupby(df['Fecha'].dt.to_period('M')).agg({
+        'Débitos': 'sum',
+        'Créditos': 'sum',
+        'Saldo': 'last'
+    }).reset_index()
+    
+    # Convertir Period a timestamp para plotting
+    df_mensual['Fecha'] = df_mensual['Fecha'].dt.to_timestamp()
+    
+    # Crear figura con subplots
+    fig = plt.figure(figsize=(15, 10))
+    
+    # 1. Tendencia de Ingresos vs Gastos
+    ax1 = plt.subplot(2, 2, 1)
+    ax1.plot(df_mensual['Fecha'], df_mensual['Débitos'], 'r-', label='Gastos', marker='o', linewidth=2)
+    ax1.plot(df_mensual['Fecha'], df_mensual['Créditos'], 'g-', label='Ingresos', marker='s', linewidth=2)
+    ax1.set_title('Tendencia de Ingresos vs Gastos', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('Fecha')
+    ax1.set_ylabel('Monto ($)')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+    plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45)
+    
+    # 2. Tendencia del Saldo
+    ax2 = plt.subplot(2, 2, 2)
+    ax2.plot(df_mensual['Fecha'], df_mensual['Saldo'], 'b-', label='Saldo', marker='o', linewidth=2)
+    ax2.set_title('Tendencia del Saldo', fontsize=12, fontweight='bold')
+    ax2.set_xlabel('Fecha')
+    ax2.set_ylabel('Saldo ($)')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+    plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45)
+    
+    # 3. Distribución de Gastos por Categoría
+    ax3 = plt.subplot(2, 2, 3)
+    top_categorias = df.groupby('Transacción_Detalle')['Débitos'].sum().nlargest(10)
+    ax3.bar(range(len(top_categorias)), top_categorias.values, color='orange', alpha=0.7)
+    ax3.set_title('Top 10 Gastos por Categoría', fontsize=12, fontweight='bold')
+    ax3.set_xlabel('Categoría')
+    ax3.set_ylabel('Total Gastos ($)')
+    ax3.set_xticks(range(len(top_categorias)))
+    ax3.set_xticklabels([cat[:20] + '...' if len(cat) > 20 else cat 
+                         for cat in top_categorias.index], 
+                        rotation=45, ha='right', fontsize=8)
+    ax3.grid(axis='y', alpha=0.3)
+    
+    # 4. Comparativa Mensual de Ingresos y Gastos
+    ax4 = plt.subplot(2, 2, 4)
+    df_mensual.plot(x='Fecha', y=['Débitos', 'Créditos'], kind='bar', ax=ax4, color=['red', 'green'], alpha=0.7)
+    ax4.set_title('Comparativa Mensual: Ingresos vs Gastos', fontsize=12, fontweight='bold')
+    ax4.set_xlabel('Mes')
+    ax4.set_ylabel('Monto ($)')
+    ax4.legend(["Gastos", "Ingresos"])
+    ax4.grid(axis='y', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Imprimir resumen estadístico mejorado
+    print("\n" + "="*60)
+    print("📊 RESUMEN DE TENDENCIAS FINANCIERAS")
+    print("="*60)
+    
+    # Resumen mensual
+    for index, row in df_mensual.iterrows():
+        mes = row['Fecha'].strftime('%Y-%m')
+        debitos = row['Débitos']
+        creditos = row['Créditos']
+        saldo = row['Saldo']
+        print(f"{mes}: Gastos=${debitos:,.2f}, Ingresos=${creditos:,.2f}, Saldo=${saldo:,.2f}")
+    
+    # Resumen por categoría
+    print("\nTop 10 categorías de gasto:")
+    top_categorias = df.groupby('Transacción_Detalle')['Débitos'].sum().nlargest(10)
+    for categoria, total in top_categorias.items():
+        print(f"  {categoria[:50]}: ${total:,.2f}")
+    
+    print("="*60 + "\n")
 
 class ModeloFinanciero:
     def __init__(self):
@@ -164,31 +257,210 @@ def optimize_lgbm(trial, X_train, y_train, X_test, y_test):
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
     return rmse
 
+def analizar_categorias(df):
+    """Análisis detallado de gastos por categorías con sugerencias de ahorro"""
+    
+    # Diccionario de clasificación de categorías
+    categorias = {
+        'Alimentación': ['COMPRA EN CANAL ELECTRONI', 'TIENDA', 'MARKET', 'FRUVER', 'CARNES', 
+                        'PANADERIA', 'SUBWAY', 'KFC', 'RESTAURAN', 'ARA', 'D1', 'EXITO', 'OXXO'],
+        'Transporte': ['RETIRO RED', 'GASOLINA', 'EDS', 'BIOMAX', 'TEXACO'],
+        'Vivienda': ['FIRENZE', 'CONJUNTO', 'ACUEDUCTO', 'ENEL', 'CLARO', 'ETB', 'VANTI'],
+        'Servicios Financieros': ['PAGO PRESTAMO', 'TRANSFEREN', 'TRASLADO', 'BANCO'],
+        'Salud': ['DROGUERIA', 'FARMA', 'COMPENSAR'],
+        'Entretenimiento': ['NEQUI', 'DAVIPLATA', 'BOLD'],
+        'Educación': ['MATRICULA', 'PROFESIONAL'],
+        'Otros': []
+    }
+    
+    def clasificar_transaccion(transaccion):
+        """Clasifica una transacción en su categoría correspondiente"""
+        transaccion_upper = str(transaccion).upper()
+        for categoria, palabras_clave in categorias.items():
+            if any(palabra in transaccion_upper for palabra in palabras_clave):
+                return categoria
+        return 'Otros'
+    
+    # Aplicar clasificación
+    df['Categoria'] = df['Transacción_Detalle'].apply(clasificar_transaccion)
+    
+    # Análisis por categoría
+    gastos_por_categoria = df.groupby('Categoria')['Débitos'].agg(['sum', 'count', 'mean']).round(2)
+    gastos_por_categoria = gastos_por_categoria.sort_values('sum', ascending=False)
+    gastos_por_categoria['porcentaje'] = (gastos_por_categoria['sum'] / df['Débitos'].sum() * 100).round(2)
+    
+    # Crear visualización
+    fig = plt.figure(figsize=(16, 10))
+    
+    # 1. Gráfico de pastel - Distribución de gastos
+    ax1 = plt.subplot(2, 2, 1)
+    colors = plt.cm.Set3(range(len(gastos_por_categoria)))
+    ax1.pie(gastos_por_categoria['sum'], labels=gastos_por_categoria.index, 
+            autopct='%1.1f%%', startangle=90, colors=colors)
+    ax1.set_title('Distribución de Gastos por Categoría', fontsize=12, fontweight='bold')
+    
+    # 2. Gráfico de barras - Monto total por categoría
+    ax2 = plt.subplot(2, 2, 2)
+    gastos_por_categoria['sum'].plot(kind='barh', ax=ax2, color=colors)
+    ax2.set_xlabel('Monto Total ($)')
+    ax2.set_title('Gastos Totales por Categoría', fontsize=12, fontweight='bold')
+    ax2.grid(axis='x', alpha=0.3)
+    
+    # 3. Evolución mensual por categoría principal
+    ax3 = plt.subplot(2, 2, 3)
+    df['Mes'] = df['Fecha'].dt.to_period('M')
+    top_categorias = gastos_por_categoria.head(4).index
+    
+    for categoria in top_categorias:
+        df_cat = df[df['Categoria'] == categoria]
+        gastos_mensuales = df_cat.groupby('Mes')['Débitos'].sum()
+        ax3.plot(gastos_mensuales.index.astype(str), gastos_mensuales.values, 
+                marker='o', label=categoria, linewidth=2)
+    
+    ax3.set_title('Evolución Mensual - Top 4 Categorías', fontsize=12, fontweight='bold')
+    ax3.set_xlabel('Mes')
+    ax3.set_ylabel('Monto ($)')
+    ax3.legend()
+    ax3.grid(True, alpha=0.3)
+    plt.xticks(rotation=45)
+    
+    # 4. Promedio de gasto por transacción
+    ax4 = plt.subplot(2, 2, 4)
+    gastos_por_categoria['mean'].plot(kind='bar', ax=ax4, color='skyblue', alpha=0.7)
+    ax4.set_title('Gasto Promedio por Transacción', fontsize=12, fontweight='bold')
+    ax4.set_xlabel('Categoría')
+    ax4.set_ylabel('Promedio ($)')
+    ax4.grid(axis='y', alpha=0.3)
+    plt.xticks(rotation=45)
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Imprimir análisis detallado
+    print("\n" + "="*80)
+    print("💰 ANÁLISIS DETALLADO DE GASTOS POR CATEGORÍAS")
+    print("="*80)
+    
+    total_gastos = df['Débitos'].sum()
+    
+    for idx, (categoria, row) in enumerate(gastos_por_categoria.iterrows(), 1):
+        print(f"\n{idx}. {categoria.upper()}")
+        print(f"   ├─ Total gastado: ${row['sum']:,.2f} ({row['porcentaje']:.1f}%)")
+        print(f"   ├─ Número de transacciones: {int(row['count'])}")
+        print(f"   └─ Promedio por transacción: ${row['mean']:,.2f}")
+    
+    # Sugerencias de ahorro
+    print("\n" + "="*80)
+    print("💡 SUGERENCIAS DE AHORRO")
+    print("="*80)
+    
+    # Identificar categorías con mayor potencial de ahorro
+    top_3_gastos = gastos_por_categoria.head(3)
+    
+    for categoria, row in top_3_gastos.iterrows():
+        porcentaje = row['porcentaje']
+        monto = row['sum']
+        ahorro_potencial_5 = monto * 0.05
+        ahorro_potencial_10 = monto * 0.10
+        ahorro_potencial_15 = monto * 0.15
+        
+        print(f"\n📌 {categoria}:")
+        print(f"   Gasto actual: ${monto:,.2f} ({porcentaje:.1f}% del total)")
+        print(f"   Ahorro potencial:")
+        print(f"      • Reduciendo 5%:  ${ahorro_potencial_5:,.2f}/mes → ${ahorro_potencial_5*12:,.2f}/año")
+        print(f"      • Reduciendo 10%: ${ahorro_potencial_10:,.2f}/mes → ${ahorro_potencial_10*12:,.2f}/año")
+        print(f"      • Reduciendo 15%: ${ahorro_potencial_15:,.2f}/mes → ${ahorro_potencial_15*12:,.2f}/año")
+    
+    # Análisis de gastos hormiga
+    gastos_pequenos = df[df['Débitos'] < 50000]
+    if len(gastos_pequenos) > 0:
+        print(f"\n🐜 ANÁLISIS DE GASTOS HORMIGA:")
+        print(f"   Total de transacciones pequeñas (<$50,000): {len(gastos_pequenos)}")
+        print(f"   Monto acumulado: ${gastos_pequenos['Débitos'].sum():,.2f}")
+        print(f"   Promedio: ${gastos_pequenos['Débitos'].mean():,.2f}")
+        print(f"   💡 Tip: Estos gastos pequeños suman {(gastos_pequenos['Débitos'].sum()/total_gastos*100):.1f}% del total")
+    
+    print("="*80 + "\n")
+    
+    return gastos_por_categoria
+
 def main():
-    """Función principal optimizada para análisis financiero"""
-    # Cargar datos
-    path = 'c:/Users/omaroalvaradoc/Documents/Personal/Proyectos/CURSO IA/data/processed/Datos Movimientos Financieros Ajustados.csv'
+    """Función principal - Análisis de tendencias financieras"""
+    # Llamar a la función principal de ejemplo_uso.py solo si está disponible
+    if ejemplo_uso_main is not None:
+        try:
+            print("🔄 Ejecutando análisis complementario...")
+            ejemplo_uso_main()
+        except Exception as e:
+            print(f"⚠️ Error en ejemplo_uso: {e}")
+    
+    # Ruta corregida
+    path = 'C:\\Users\\omaroalvaradoc\\Documents\\Personal\\Proyectos\\CURSO IA\\src\\data\\Datos Movimientos Financieros.csv'
+    
+    if not os.path.exists(path):
+        print(f"❌ Error: El archivo no se encuentra en la ruta: {path}")
+        return
     
     try:
+        # Cargar datos
         df = pd.read_csv(path)
-        print(f"📊 Datos cargados: {len(df)} registros")
+        print(f"📊 Datos cargados: {len(df)} registros\n")
         
-        # Convertir fechas
+        # Convertir fechas - MEJORADO para manejar formato con año incluido
         month_dict = {
             'ENE': '01', 'FEB': '02', 'MAR': '03', 'ABR': '04',
             'MAY': '05', 'JUN': '06', 'JUL': '07', 'AGO': '08',
             'SEP': '09', 'OCT': '10', 'NOV': '11', 'DIC': '12'
         }
         
-        def convert_date(date_str):
+        def convert_date_smart(date_str):
+            """Conversión inteligente de fechas con soporte para formato con año incluido"""
             try:
-                month, day = date_str.split()[:2]
-                return f"2025-{month_dict.get(month, '01')}-{day.zfill(2)}"
-            except:
-                return f"2025-01-01"
+                parts = date_str.split()
+                
+                # Verificar si el primer elemento es un año (4 dígitos)
+                if len(parts) >= 3 and parts[0].isdigit() and len(parts[0]) == 4:
+                    # Formato "YYYY MES DIA"
+                    year = parts[0]
+                    month = parts[1]
+                    day = parts[2]
+                else:
+                    # Formato anterior "MES DIA"
+                    month = parts[0]
+                    day = parts[1]
+                    # Usar año actual si no se proporciona
+                    year = str(pd.Timestamp.now().year)
+                
+                return f"{year}-{month_dict.get(month, '01')}-{day.zfill(2)}"
+                
+            except Exception as e:
+                print(f"⚠️ Error procesando fecha '{date_str}': {e}")
+                return f"{pd.Timestamp.now().year}-01-01"
 
-        df['Fecha'] = df['Fecha'].apply(convert_date)
+        print("🔄 Aplicando conversión inteligente de fechas...")
+        df['Fecha'] = df['Fecha'].apply(convert_date_smart)
         df['Fecha'] = pd.to_datetime(df['Fecha'])
+        
+        # Verificar y mostrar distribución de años
+        print("📅 Distribución de datos por año:")
+        años_dist = df['Fecha'].dt.year.value_counts().sort_index()
+        for año, count in años_dist.items():
+            print(f"   {año}: {count} registros")
+        
+        # Verificar conversión correcta por período
+        print("\n📅 Verificando conversión de fechas por período:")
+        fechas_unicas = df['Fecha'].dt.to_period('M').unique()
+        for fecha in sorted(fechas_unicas):
+            count = len(df[df['Fecha'].dt.to_period('M') == fecha])
+            año_mes = str(fecha)
+            print(f"   {año_mes}: {count} registros")
+        
+        # Advertencia si hay fechas futuras
+        fecha_actual = pd.Timestamp.now()
+        fechas_futuras = df[df['Fecha'] > fecha_actual]
+        if len(fechas_futuras) > 0:
+            print(f"\n⚠️ Se detectaron {len(fechas_futuras)} registros con fechas futuras")
+            print("   Esto es normal si estás proyectando o tienes datos programados")
         
         # Limpiar valores numéricos
         def clean_numeric(x):
@@ -198,23 +470,30 @@ def main():
                 return float(x.replace(',', '').strip())
             return float(x)
         
-        # Corregir nombre de columna de Saldos a Saldo
         df['Débitos'] = df['Débitos'].apply(clean_numeric)
         df['Créditos'] = df['Créditos'].apply(clean_numeric)
-        df['Saldo'] = df['Saldo'].apply(clean_numeric)  # Cambiado de 'Saldos' a 'Saldo'
+        df['Saldo'] = df['Saldo'].apply(clean_numeric)
+    
+        # Realizar análisis de tendencias
+        print("🔍 Iniciando análisis de tendencias...\n")
+        analizar_tendencias(df)
         
-        # Agrupar por mes
+        # Análisis de categorías
+        print("\n🏷️ Iniciando análisis de categorías...\n")
+        gastos_por_categoria = analizar_categorias(df)
+        
+        # 🔥 CONSOLIDADO: Una sola agrupación mensual
         df_mensual = df.groupby(df['Fecha'].dt.to_period('M')).agg({
             'Débitos': 'sum',
             'Créditos': 'sum',
-            'Saldo': 'last'  # Cambiado de 'Saldos' a 'Saldo'
+            'Saldo': 'last'
         }).reset_index()
         
         # Preparar datos para el modelo
         datos_modelo = pd.DataFrame({
             'fecha': df_mensual['Fecha'].dt.to_timestamp(),
             'total_mensual': df_mensual['Débitos'],
-            'capital': df_mensual['Saldo'],  # Cambiado de 'Saldos' a 'Saldo'
+            'capital': df_mensual['Saldo'],
             'gastos_fijos': df_mensual['Débitos'] - df_mensual['Créditos']
         })
         
@@ -241,14 +520,6 @@ def main():
                 modelo.predecir(ultimo['capital'], ultimo['gastos_fijos'])
         else:
             print("⚠️ Datos insuficientes para entrenar modelo (mínimo 6 meses)")
-        
-        # Análisis de categorías de gasto
-        print("\n🏷️ ANÁLISIS POR CATEGORÍA:")
-        # Cambiar 'Transacción' por 'Transacción_Detalle'
-        top_transacciones = df['Transacción_Detalle'].value_counts().head(10)
-        for trans, count in top_transacciones.items():
-            monto_total = df[df['Transacción_Detalle'] == trans]['Débitos'].sum()
-            print(f"   {trans[:40]:40} | {count:3d} trans | ${monto_total:>12,.2f}")
         
         # Gráficos de tendencia
         plt.figure(figsize=(14, 8))
