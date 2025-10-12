@@ -10,14 +10,10 @@ import matplotlib.pyplot as plt
 import warnings
 import joblib
 import json
-# Fix import path - use absolute import
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_loader import DataLoader
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
 
 warnings.filterwarnings('ignore')
 
@@ -31,15 +27,13 @@ class ModeloHibrido:
         self.orden_arima_auto = orden_arima_auto
         self.metricas = {'evaluacion': {}, 'entrenamiento': {}}
         self.componentes = {}
-        self.df_entrenamiento = None  # Agregar esta línea
+        self.df_entrenamiento = None
         self.variables_macro = ['tasa_uvr', 'tasa_dtf', 'inflacion_ipc']
         self.columnas_categoricas = ['tipo_pago']
-        self.exog_transformer = None  # Para almacenar transformación de exógenas
         self.data_loader = DataLoader()
-        
-        self.ultimas_predicciones = {}  # Añadir este atributo
-        self.historial_predicciones = []  # Para tracking histórico
-        self.errores_prediccion = []  # Para monitoreo de errores
+        self.ultimas_predicciones = {}
+        self.historial_predicciones = []
+        self.errores_prediccion = []
 
     def ensure_df_exog(self, exog):
         """Devuelve exog como DataFrame y orden fijo de columnas."""
@@ -149,12 +143,6 @@ class ModeloHibrido:
         
         # Preparar variables categóricas con dummies
         X_cat = pd.get_dummies(df[self.columnas_categoricas], drop_first=True)
-        
-        # Guardar transformación para uso futuro
-        self.exog_transformer = {
-            'columnas_exog': self.variables_macro,
-            'columnas_cat': list(X_cat.columns)
-        }
         
         # Combinar todas las features
         X = np.hstack([X_base, X_exog.values, X_cat.values])

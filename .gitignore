@@ -1,46 +1,98 @@
-# Archivos de extractos bancarios y datos sensibles
-*extracto*.csv
-*extracto*.xlsx
-*extracto*.xls
-*hipoteca*.csv
-*hipoteca*.xlsx
-*hipoteca*.xls
-*.pdf
+# Python# Archivos de extractos bancarios y datos sensibles
 
-# Carpetas de datos
+__pycache__/*extracto*.csv
+
+*.py[cod]*extracto*.xlsx
+
+*$py.class*extracto*.xls
+
+*.so*hipoteca*.csv
+
+.Python*hipoteca*.xlsx
+
+*.egg-info/*hipoteca*.xls
+
+dist/*.pdf
+
+build/
+
+*.egg# Carpetas de datos
+
 data/raw/*
-data/processed/*
-data/predictions/*
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/predictions/.gitkeep
 
-# Ambiente virtual de Python
-venv/
-env/
-.env
+# Virtual Environmentdata/processed/*
 
-# Archivos de caché de Python
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
+venv/data/predictions/*
 
-# Archivos de IDEs
-.vscode/
-.idea/
-*.swp
+.venv/!data/raw/.gitkeep
+
+env/!data/processed/.gitkeep
+
+ENV/!data/predictions/.gitkeep
+
+
+
+# IDEs# Ambiente virtual de Python
+
+.vscode/venv/
+
+.idea/env/
+
+*.swp.env
+
 *.swo
 
-# Archivos del sistema
-.DS_Store
+*~# Archivos de caché de Python
+
+__pycache__/
+
+# Jupyter Notebook*.py[cod]
+
+.ipynb_checkpoints/*$py.class
+
+*.ipynb_checkpoints.pytest_cache/
+
+
+
+# Data files (opcional - comenta si quieres versionar los datos)# Archivos de IDEs
+
+# data/raw/*.csv.vscode/
+
+# data/raw/*.xlsx.idea/
+
+*.swp
+
+# Model files*.swo
+
+*.pkl
+
+*.h5# Archivos del sistema
+
+*.joblib.DS_Store
+
 Thumbs.db
 
-# Logs y outputs
-*.log
-output/
-logs/
+# Predictions output
 
-# Archivos temporales
-*.tmp
+data/predictions/**/*.json# Logs y outputs
+
+!data/predictions/.gitkeep*.log
+
+output/
+
+# OSlogs/
+
+.DS_Store
+
+Thumbs.db# Archivos temporales
+
+desktop.ini*.tmp
+
 *~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp

@@ -84,9 +84,3 @@ class ExternalDataService:
             'dtf': self.obtener_dtf() or 7.12,    # Valor por defecto si falla
             'uvr': self.obtener_uvr() or 395.002  # Valor por defecto si falla
         }
-        """Obtiene todos los valores actuales disponibles"""
-        return {
-            'ipc': self.obtener_ipc() or 150.99,  # Valor por defecto si falla
-            'dtf': self.obtener_dtf() or 7.12,    # Valor por defecto si falla
-            'uvr': self.obtener_uvr() or 395.002  # Valor por defecto si falla
-        }

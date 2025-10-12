@@ -1,79 +1,173 @@
-# AI Course Workspace
+# 📊 Proyecto de Análisis Financiero con IA
 
-This workspace is set up for AI/ML development with Python. It includes common libraries and tools needed for machine learning, data analysis, and deep learning.
+Proyecto de predicción y análisis de movimientos financieros utilizando Machine Learning e inteligencia artificial.
 
-## Project Structure
+## 🎯 Objetivo
 
-- `src/` - Source code files
-- `data/` - Dataset storage
-- `notebooks/` - Jupyter notebooks for experiments and tutorials
-- `models/` - Saved ML models
+Analizar movimientos financieros personales para:
 
-## Setup
+- Identificar tendencias de gastos e ingresos
+- Categorizar y visualizar patrones de consumo
+- Generar predicciones de gastos futuros
+- Proporcionar recomendaciones de ahorro
 
-1. Create a virtual environment:
+## 📁 Estructura del Proyecto
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate
+```
+CURSO_IA/
+├── README.md                          # Este archivo
+├── requirements.txt                   # Dependencias del proyecto
+├── .gitignore                        # Archivos a ignorar en git
+│
+├── data/                             # Datos del proyecto
+│   ├── raw/                          # Datos crudos sin procesar
+│   │   └── Datos Movimientos Financieros.csv
+│   └── predictions/                  # Predicciones generadas
+│       └── 2025/
+│
+├── src/                              # Código fuente
+│   ├── main.py                       # Script principal de análisis
+│   │
+│   ├── core/                         # Modelos de Machine Learning
+│   │   ├── modelo_hibrido.py        # Modelo híbrido Ridge + ARIMA
+│   │   └── modelo_series_temporales.py  # Modelos de series temporales
+│   │
+│   ├── services/                     # Servicios externos
+│   │   └── external_data_service.py # Obtención de datos macro (IPC, DTF, UVR)
+│   │
+│   └── utils/                        # Utilidades
+│       └── data_loader.py           # Carga y preparación de datos
+│
+├── notebooks/                        # Jupyter notebooks para experimentación
+│   └── experiments/
+│
+└── ejercicios/                       # Ejercicios del curso (separados)
+    └── dataset_bigdata.xlsx
 ```
 
-2. Install dependencies:
+## 🚀 Instalación
+
+1. **Clonar el repositorio**
+
+```powershell
+git clone https://github.com/oalvaradoc77g/Proyecto-IA.git
+cd "CURSO IA"
+```
+
+2. **Crear entorno virtual**
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate
+```
+
+3. **Instalar dependencias**
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-## Getting Started
+## 💻 Uso
 
-1. Activate the virtual environment (if not already activated):
+### Análisis de Movimientos Financieros
 
-```powershell
-.\venv\Scripts\Activate
-```
-
-2. Launch Jupyter notebooks:
+Ejecutar el análisis completo:
 
 ```powershell
-jupyter notebook
+python src/main.py
 ```
 
-The workspace includes the following key libraries:
+Este script genera:
 
-- NumPy - For numerical computations
-- Pandas - For data manipulation and analysis
-- Scikit-learn - For machine learning algorithms
-- TensorFlow - For deep learning
-- Matplotlib - For data visualization
+- 📈 Gráficos de tendencias de ingresos vs gastos
+- 🏷️ Categorización automática de transacciones
+- 💡 Sugerencias de ahorro personalizadas
+- 🐜 Análisis de "gastos hormiga"
 
-## Examples
+### Predicción con Modelo Híbrido
 
-1. Run the Hello World program:
+```python
+from src.core.modelo_hibrido import ModeloHibrido
+from src.utils.data_loader import DataLoader
 
-```powershell
-python src/hello_world.py
+# Cargar y preparar datos
+loader = DataLoader()
+df = loader.enriquecer_datos(df_base)
+
+# Entrenar modelo
+modelo = ModeloHibrido(orden_arima_auto=True)
+modelo.entrenar(df)
+
+# Predecir 6 meses
+predicciones = modelo.predecir_futuro(n_predicciones=6)
 ```
 
-2. Run Python Variables Examples:
+## 📊 Características
 
-```powershell
-python src/python_variables.py
-```
+### Análisis de Tendencias
 
-3. Run Practice 1 - Lists and Extractions:
+- Visualización temporal de ingresos y gastos
+- Evolución del saldo bancario
+- Identificación de patrones mensuales
 
-```powershell
-python src/practica1.py
-```
+### Categorización Inteligente
 
-4. Run Practice 2 - Strings and Lists:
+Clasifica automáticamente transacciones en:
 
-```powershell
-python src/practica2.py
-```
+- 🍽️ Alimentación
+- 🚗 Transporte
+- 🏠 Vivienda
+- 💳 Servicios Financieros
+- 💊 Salud
+- 🎮 Entretenimiento
+- 📚 Educación
 
-This will show examples of different Python variable types, lists, and arrays with detailed documentation. And the second practice demonstrates working with strings containing numbers and text, as well as list operations.
+### Modelos de Predicción
 
-# Proyecto de Predicción de Hipotecas
+1. **Modelo Híbrido** (`modelo_hibrido.py`)
 
-## Estructura del Proyecto
+   - Combina regresión Ridge + ARIMA
+   - Incorpora variables macroeconómicas (IPC, DTF, UVR)
+   - Predicción con intervalos de confianza
+
+2. **Series Temporales** (`modelo_series_temporales.py`)
+   - ARIMA optimizado
+   - Prophet (para series largas)
+   - Validación automática de estacionariedad
+
+## 🔧 Dependencias Principales
+
+- **Análisis de datos**: pandas, numpy
+- **Visualización**: matplotlib, seaborn
+- **Machine Learning**: scikit-learn
+- **Series Temporales**: statsmodels, prophet
+- **Datos externos**: requests (API Banco de la República)
+
+## 📈 Resultados
+
+El proyecto genera:
+
+- Reportes visuales en ventanas matplotlib
+- Predicciones guardadas en `data/predictions/`
+- Métricas de rendimiento de modelos
+- Sugerencias de ahorro basadas en análisis
+
+## 🤝 Contribuciones
+
+Este es un proyecto personal de aprendizaje. Sugerencias y mejoras son bienvenidas.
+
+## 📝 Licencia
+
+Proyecto educativo - Uso libre para aprendizaje
+
+## 👤 Autor
+
+**Omar Alvarado**
+
+- GitHub: [@oalvaradoc77g](https://github.com/oalvaradoc77g)
+- Proyecto: Curso IA Financiero
+
+---
+
+**Rama actual**: `IA_Financiero_Debito`  
+**Última actualización**: Octubre 2025
