@@ -1,6 +1,14 @@
 {
     "python.analysis.extraPaths": [
+        "./src",
         "./src/core",
-        "./src/Proyectos"
-    ]
+        "./src/Proyectos",
+        "./src/domain",
+        "./src/application",
+        "./src/infrastructure",
+        "./src/ports",
+        "./src/presentation"
+    ],
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+    "python.terminal.activateEnvironment": true
 }

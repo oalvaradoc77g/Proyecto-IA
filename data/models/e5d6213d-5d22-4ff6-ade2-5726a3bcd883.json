@@ -1,0 +1,19 @@
+{
+    "id": "e5d6213d-5d22-4ff6-ade2-5726a3bcd883",
+    "tipo": "hibrido",
+    "fecha_entrenamiento": "2025-10-25T10:53:42.684550",
+    "metricas": {
+        "r2": 0.85,
+        "mse": 1000.0,
+        "rmse": 31.62,
+        "mae": 25.0,
+        "mape": 5.2
+    },
+    "parametros": {
+        "orden_arima_auto": true,
+        "alpha_ridge": null
+    },
+    "version": "1.0.0",
+    "activo": true,
+    "calidad": "Buena"
+}
