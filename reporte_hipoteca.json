@@ -1,0 +1,30 @@
+{
+    "fecha_generacion": "2025-10-25 16:44:28",
+    "datos_actuales": {
+        "capital_actual": 8137835.0,
+        "cuota_actual": 9250000.0,
+        "gastos_fijos": 1112165.0
+    },
+    "estimacion_proximo_mes": {
+        "fecha_proximo": "2025-10-30",
+        "cuota_total": 9264245.494548127,
+        "gastos_fijos": 1137657.0,
+        "abono_capital": 8126588.494548127,
+        "capital_restante": 11246.505451872945,
+        "meses_restantes": 1,
+        "fecha_finalizacion": "2025-10-30",
+        "porcentaje_completado": 97.50705325217332
+    },
+    "predicciones_escenarios": {
+        "Optimista": 9268749.156758737,
+        "Base": 9268749.156758737,
+        "Pesimista": 9268749.156758737
+    },
+    "metricas_modelo": {
+        "r2": 0.9999910838209952,
+        "mse": 126263325.10367416,
+        "rmse": 11236.695470807872,
+        "mae": 10643.845656906255,
+        "mape": 0.28127352515061993
+    }
+}

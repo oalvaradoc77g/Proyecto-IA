@@ -1,6 +1,6 @@
 {
-    "predicciones_realizadas": 16,
-    "ultima_actualizacion": "2025-10-25 15:34:12",
+    "predicciones_realizadas": 18,
+    "ultima_actualizacion": "2025-10-25 16:44:24",
     "historico": [
         {
             "fecha_generacion": "2025-10-06 12:04:23",
@@ -79,6 +79,16 @@
         },
         {
             "fecha_generacion": "2025-10-25 15:34:12",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-25 16:37:47",
+            "error_promedio": null,
+            "metricas": {}
+        },
+        {
+            "fecha_generacion": "2025-10-25 16:44:24",
             "error_promedio": null,
             "metricas": {}
         }

@@ -1,7 +1,7 @@
 {
-    "id": "e5d6213d-5d22-4ff6-ade2-5726a3bcd883",
+    "id": "647b9825-33e5-4b1c-a2ed-9ab1d613432c",
     "tipo": "hibrido",
-    "fecha_entrenamiento": "2025-10-25T10:53:42.684550",
+    "fecha_entrenamiento": "2025-11-09T08:27:59.311430",
     "metricas": {
         "r2": 0.85,
         "mse": 1000.0,
@@ -14,6 +14,6 @@
         "alpha_ridge": null
     },
     "version": "1.0.0",
-    "activo": false,
+    "activo": true,
     "calidad": "Buena"
 }
