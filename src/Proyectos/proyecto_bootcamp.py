@@ -13,6 +13,8 @@ import signal
 
 import numpy as np
 import pandas as pd
+import shutil
+import warnings
 
 # import opcionales
 try:
@@ -33,7 +35,7 @@ except Exception as _import_exc:
 # tkinter y matplotlib solo si hay GUI
 try:
     import tkinter as tk
-    from tkinter import ttk, scrolledtext, messagebox
+    from tkinter import ttk, scrolledtext, messagebox, filedialog
     import matplotlib.pyplot as plt
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 except Exception:
@@ -58,11 +60,14 @@ def cargar_movimientos_csv(ruta_csv):
     # Normalizar nombre de fecha
     if "Fecha" in df.columns:
         fechas = df["Fecha"].astype(str).str.strip()
-        # Intentar parseo flexible sin usar el argumento obsoleto
-        # Primero intento el parseo general (pandas/dateutil)
-        df["Fecha_parsed"] = pd.to_datetime(fechas, errors="coerce")
-        # Si muchas fechas nulas, intentar reemplazar meses en español por inglés breve
-        if df["Fecha_parsed"].isna().mean() > 0.2:
+        df["Fecha_parsed"] = pd.NaT
+        patron = fechas.str.match(r"^\d{4}\s[A-Za-z]{3}\s\d{2}$")
+        if patron.any():
+            df.loc[patron, "Fecha_parsed"] = pd.to_datetime(
+                fechas.loc[patron], format="%Y %b %d", errors="coerce"
+            )
+        faltantes = df["Fecha_parsed"].isna()
+        if faltantes.any():
             mes_map = {
                 "ENE": "JAN",
                 "FEB": "FEB",
@@ -77,14 +82,12 @@ def cargar_movimientos_csv(ruta_csv):
                 "NOV": "NOV",
                 "DIC": "DEC",
             }
-            fechas2 = fechas.replace(mes_map, regex=True)
-            # Intentar un formato estricto común: 'YYYY MON DD' (ej: '2024 OCT 02')
-            df["Fecha_parsed"] = pd.to_datetime(
-                fechas2, errors="coerce", format="%Y %b %d"
-            )
-            # Si sigue fallando, volver al parser flexible sobre la versión traducida
-            if df["Fecha_parsed"].isna().mean() > 0.2:
-                df["Fecha_parsed"] = pd.to_datetime(fechas2, errors="coerce")
+            fechas_norm = fechas.loc[faltantes].str.upper().replace(mes_map, regex=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                df.loc[faltantes, "Fecha_parsed"] = pd.to_datetime(
+                    fechas_norm, errors="coerce"
+                )
         df["Fecha"] = df["Fecha_parsed"]
         df.drop(columns=["Fecha_parsed"], inplace=True, errors="ignore")
     else:
@@ -135,6 +138,69 @@ def cargar_movimientos_csv(ruta_csv):
 
 
 # -------------------------
+# Clase: MiniMLP (Micro red neuronal para patrones financieros)
+# Mini MLP simple para componente neuronal
+# MLP es Multi-Layer Perceptron (Perceptrón Multicapa)
+# -------------------------
+class MiniMLP:
+    # Inicializa pesos y biases
+    # biases son vectores añadidos a cada capa
+    # hidden es 6 debido a que es un tamaño común para una capa oculta pequeña
+    # seed es 42 porque es un valor común para reproducibilidad
+    def __init__(self, input_dim, hidden_dim=6, seed=42):
+        rng = np.random.default_rng(seed)
+        self.W1 = rng.normal(scale=0.1, size=(input_dim, hidden_dim))
+        self.b1 = np.zeros(hidden_dim)
+        self.W2 = rng.normal(scale=0.1, size=(hidden_dim, 1))
+        self.b2 = np.zeros(1)
+
+    # Funciones de activación y derivadas
+    def _relu(self, x):
+        return np.maximum(0, x)
+
+    # Derivada de ReLU se encarga de retornar 1 donde x>0, 0 en otro caso, x es la entrada pre-activación
+    def _relu_deriv(self, x):
+        return (x > 0).astype(float)
+
+    # Función sigmoide para salida entre 0 y 1
+    def _sigmoid(self, x):
+        return 1.0 / (1.0 + np.exp(-x))
+
+    # Entrenamiento con descenso de gradiente
+    # epochs es la cantidad de iteraciones para entrenar se deja 400 porque es un valor común para un entrenamiento rápido
+    # lr es la tasa de aprendizaje se deja 0.04 porque es un valor común para un entrenamiento rápido
+    # X es la matriz de características de entrada
+    # y es el vector de etiquetas o valores objetivo
+    def entrenar(self, X, y, epochs=500, lr=0.05):
+        if len(X) == 0:
+            return
+        for _ in range(epochs):
+            z1 = X @ self.W1 + self.b1
+            a1 = self._relu(z1)
+            z2 = a1 @ self.W2 + self.b2
+            y_pred = self._sigmoid(z2)
+            error = y_pred - y
+
+            grad_W2 = a1.T @ error / len(X)
+            grad_b2 = error.mean(axis=0)
+            da1 = error @ self.W2.T
+            dz1 = da1 * self._relu_deriv(z1)
+            grad_W1 = X.T @ dz1 / len(X)
+            grad_b1 = dz1.mean(axis=0)
+
+            self.W2 -= lr * grad_W2
+            self.b2 -= lr * grad_b2
+            self.W1 -= lr * grad_W1
+            self.b1 -= lr * grad_b1
+
+    def predecir(self, X):
+        z1 = X @ self.W1 + self.b1
+        a1 = self._relu(z1)
+        z2 = a1 @ self.W2 + self.b2
+        return self._sigmoid(z2)
+
+
+# -------------------------
 # Clase: AsistenteFinancieroDifuso (modo consola + opcional GUI)
 # -------------------------
 class AsistenteFinancieroDifuso:
@@ -151,8 +217,11 @@ class AsistenteFinancieroDifuso:
             # Genera datos simulados si no se pasan datos
             else self._generar_simulados()
         )
+        self.origen_datos = "CSV" if isinstance(datos_df, pd.DataFrame) else "Simulado"
+        self.neuro_modelo = None
         self._asegurar_tipos()
         self._crear_sistema_difuso()
+        self._entrenar_neuro_modelo()
         if self.root is not None:
             if tk is None:
                 raise RuntimeError("Tkinter no disponible en este entorno")
@@ -305,14 +374,16 @@ class AsistenteFinancieroDifuso:
         self.sim.input["ratio_gasto_essencial"] = metricas["ratio_gasto_essencial"]
         self.sim.input["estabilidad_ingresos"] = metricas["estabilidad_ingresos"]
         self.sim.compute()
-        val = float(self.sim.output["recomendacion"])
-        if val <= 30:
+        valor_difuso = float(self.sim.output["recomendacion"])
+        valor_neuronal = self._inferir_neuro(metricas)
+        valor_final = (valor_difuso * 0.6) + (valor_neuronal * 0.4)
+        if valor_final <= 30:
             cat = "EMERGENCIA"
             exp = "Recortar gastos no esenciales, crear fondo de emergencia, revisar deudas."
-        elif val <= 60:
+        elif valor_final <= 60:
             cat = "CONSERVADOR"
             exp = "Mantener ahorro, instrumentos de bajo riesgo, construir fondo 3-6 meses."
-        elif val <= 80:
+        elif valor_final <= 80:
             cat = "MODERADO"
             exp = "Incrementar inversiones, considerar riesgo medio, plan largo plazo."
         else:
@@ -320,7 +391,9 @@ class AsistenteFinancieroDifuso:
             exp = "Diversificar agresivamente, aprovechar alta capacidad de ahorro."
         return {
             "categoria": cat,
-            "valor": val,
+            "valor": valor_final,
+            "valor_difuso": valor_difuso,
+            "valor_neuronal": valor_neuronal,
             "explicacion": exp,
             "metricas": metricas,
         }
@@ -339,6 +412,9 @@ class AsistenteFinancieroDifuso:
         print(f"Ingreso Promedio: ${m['ingreso_promedio']:.2f}")
         print(f"Ahorro Promedio: ${m['ahorro_promedio']:.2f}")
         print(f"Recomendación: {r['categoria']} ({r['valor']:.1f})")
+        print(
+            f"  · Difuso: {r['valor_difuso']:.1f} | Neuronal: {r['valor_neuronal']:.1f}"
+        )
         print(r["explicacion"])
         print("=" * 70)
 
@@ -351,6 +427,40 @@ class AsistenteFinancieroDifuso:
         btn.pack(fill="x", pady=5)
         self.txt = scrolledtext.ScrolledText(frame, width=80, height=20)
         self.txt.pack(fill="both", expand=True, pady=5)
+        ttk.Label(frame, text=f"Fuente de datos: {self.origen_datos}").pack(fill="x")
+        tablero = ttk.LabelFrame(frame, text="Panel Neuro-Difuso", padding=10)
+        tablero.pack(fill="x", pady=5)
+        self.metricas_widgets = {}
+        for idx, (clave, texto) in enumerate(
+            [
+                ("ratio_ahorro", "Ratio de Ahorro"),
+                ("ratio_gasto_essencial", "Gasto Esencial"),
+                ("estabilidad_ingresos", "Estabilidad Ingresos"),
+            ]
+        ):
+            fila = ttk.Frame(tablero)
+            fila.grid(row=idx, column=0, sticky="ew", pady=2)
+            lbl = ttk.Label(fila, text=f"{texto}: --")
+            lbl.pack(side="left")
+            if clave == "ratio_ahorro":
+                ttk.Button(
+                    fila,
+                    text="?",
+                    width=2,
+                    command=self._mostrar_info_ratio,
+                ).pack(side="left", padx=(6, 0))
+            pb = ttk.Progressbar(fila, maximum=100, length=220)
+            pb.pack(side="right", padx=5)
+            self.metricas_widgets[clave] = (lbl, pb)
+        self.lbl_categoria = ttk.Label(
+            tablero, text="Perfil pendiente", font=("Arial", 12, "bold")
+        )
+        self.lbl_categoria.grid(row=3, column=0, sticky="w", pady=(8, 2))
+        self.pb_recomendacion = ttk.Progressbar(tablero, maximum=100, length=320)
+        self.pb_recomendacion.grid(row=4, column=0, sticky="ew")
+        ttk.Button(
+            frame, text="💾 Exportar código .txt", command=self._guardar_script_txt
+        ).pack(fill="x", pady=5)
         if plt is not None:
             btn_g = ttk.Button(frame, text="Ver gráficas", command=self._graficas_gui)
             btn_g.pack(fill="x", pady=5)
@@ -366,10 +476,244 @@ class AsistenteFinancieroDifuso:
             f"Ingreso Promedio: ${m['ingreso_promedio']:.2f}\n"
             f"Ahorro Promedio: ${m['ahorro_promedio']:.2f}\n\n"
             f"Recomendación: {r['categoria']} ({r['valor']:.1f})\n"
+            f"  · Difuso: {r['valor_difuso']:.1f} | Neuronal: {r['valor_neuronal']:.1f}\n"
             f"{r['explicacion']}\n"
         )
         self.txt.delete("1.0", "end")
         self.txt.insert("1.0", reporte)
+        self._actualizar_panel_metricas(m, r)
+
+    def _mostrar_info_ratio(self):
+        mensaje = (
+            "Ratio de Ahorro = (Ahorro promedio / Ingreso promedio) * 100.\n"
+            "Valores altos indican mayor capacidad para cubrir imprevistos "
+            "y asumir estrategias de inversión más agresivas."
+        )
+        if messagebox is not None:
+            messagebox.showinfo("¿Qué es el Ratio de Ahorro?", mensaje)
+        else:
+            print(mensaje)
+
+    def obtener_recomendacion(self):
+        metricas = self.calcular_metricas()
+        self.sim.input["ratio_ahorro"] = metricas["ratio_ahorro"]
+        self.sim.input["ratio_gasto_essencial"] = metricas["ratio_gasto_essencial"]
+        self.sim.input["estabilidad_ingresos"] = metricas["estabilidad_ingresos"]
+        self.sim.compute()
+        valor_difuso = float(self.sim.output["recomendacion"])
+        valor_neuronal = self._inferir_neuro(metricas)
+        valor_final = (valor_difuso * 0.6) + (valor_neuronal * 0.4)
+        if valor_final <= 30:
+            cat = "EMERGENCIA"
+            exp = "Recortar gastos no esenciales, crear fondo de emergencia, revisar deudas."
+        elif valor_final <= 60:
+            cat = "CONSERVADOR"
+            exp = "Mantener ahorro, instrumentos de bajo riesgo, construir fondo 3-6 meses."
+        elif valor_final <= 80:
+            cat = "MODERADO"
+            exp = "Incrementar inversiones, considerar riesgo medio, plan largo plazo."
+        else:
+            cat = "AGRESIVO"
+            exp = "Diversificar agresivamente, aprovechar alta capacidad de ahorro."
+        return {
+            "categoria": cat,
+            "valor": valor_final,
+            "valor_difuso": valor_difuso,
+            "valor_neuronal": valor_neuronal,
+            "explicacion": exp,
+            "metricas": metricas,
+        }
+
+    # modo consola
+    def correr_en_consola(self):
+        r = self.obtener_recomendacion()
+        m = r["metricas"]
+        print("=" * 70)
+        print("INFORME FINANCIERO - Asistente Difuso")
+        print("=" * 70)
+        print(f"Fecha análisis: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        print(f"Ratio Ahorro: {m['ratio_ahorro']:.1f}%")
+        print(f"Ratio Gasto Esencial: {m['ratio_gasto_essencial']:.1f}%")
+        print(f"Estabilidad Ingresos: {m['estabilidad_ingresos']:.1f}%")
+        print(f"Ingreso Promedio: ${m['ingreso_promedio']:.2f}")
+        print(f"Ahorro Promedio: ${m['ahorro_promedio']:.2f}")
+        print(f"Recomendación: {r['categoria']} ({r['valor']:.1f})")
+        print(
+            f"  · Difuso: {r['valor_difuso']:.1f} | Neuronal: {r['valor_neuronal']:.1f}"
+        )
+        print(r["explicacion"])
+        print("=" * 70)
+
+    # GUI mínima (opcional)
+    def _crear_interfaz(self):
+        self.root.title("Asistente Financiero - Lógica Difusa")
+        frame = ttk.Frame(self.root, padding=10)
+        frame.pack(fill="both", expand=True)
+        btn = ttk.Button(frame, text="Analizar situación", command=self._accion_gui)
+        btn.pack(fill="x", pady=5)
+        self.txt = scrolledtext.ScrolledText(frame, width=80, height=20)
+        self.txt.pack(fill="both", expand=True, pady=5)
+        ttk.Label(frame, text=f"Fuente de datos: {self.origen_datos}").pack(fill="x")
+        tablero = ttk.LabelFrame(frame, text="Panel Neuro-Difuso", padding=10)
+        tablero.pack(fill="x", pady=5)
+        self.metricas_widgets = {}
+        for idx, (clave, texto) in enumerate(
+            [
+                ("ratio_ahorro", "Ratio de Ahorro"),
+                ("ratio_gasto_essencial", "Gasto Esencial"),
+                ("estabilidad_ingresos", "Estabilidad Ingresos"),
+            ]
+        ):
+            fila = ttk.Frame(tablero)
+            fila.grid(row=idx, column=0, sticky="ew", pady=2)
+            lbl = ttk.Label(fila, text=f"{texto}: --")
+            lbl.pack(side="left")
+            if clave == "ratio_ahorro":
+                ttk.Button(
+                    fila,
+                    text="?",
+                    width=2,
+                    command=self._mostrar_info_ratio,
+                ).pack(side="left", padx=(6, 0))
+            pb = ttk.Progressbar(fila, maximum=100, length=220)
+            pb.pack(side="right", padx=5)
+            self.metricas_widgets[clave] = (lbl, pb)
+        self.lbl_categoria = ttk.Label(
+            tablero, text="Perfil pendiente", font=("Arial", 12, "bold")
+        )
+        self.lbl_categoria.grid(row=3, column=0, sticky="w", pady=(8, 2))
+        self.pb_recomendacion = ttk.Progressbar(tablero, maximum=100, length=320)
+        self.pb_recomendacion.grid(row=4, column=0, sticky="ew")
+        ttk.Button(
+            frame, text="💾 Exportar código .txt", command=self._guardar_script_txt
+        ).pack(fill="x", pady=5)
+        if plt is not None:
+            btn_g = ttk.Button(frame, text="Ver gráficas", command=self._graficas_gui)
+            btn_g.pack(fill="x", pady=5)
+
+    def _accion_gui(self):
+        r = self.obtener_recomendacion()
+        m = r["metricas"]
+        reporte = (
+            f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
+            f"Ratio Ahorro: {m['ratio_ahorro']:.1f}%\n"
+            f"Ratio Gasto Esencial: {m['ratio_gasto_essencial']:.1f}%\n"
+            f"Estabilidad: {m['estabilidad_ingresos']:.1f}%\n"
+            f"Ingreso Promedio: ${m['ingreso_promedio']:.2f}\n"
+            f"Ahorro Promedio: ${m['ahorro_promedio']:.2f}\n\n"
+            f"Recomendación: {r['categoria']} ({r['valor']:.1f})\n"
+            f"  · Difuso: {r['valor_difuso']:.1f} | Neuronal: {r['valor_neuronal']:.1f}\n"
+            f"{r['explicacion']}\n"
+        )
+        self.txt.delete("1.0", "end")
+        self.txt.insert("1.0", reporte)
+        self._actualizar_panel_metricas(m, r)
+
+    def _actualizar_panel_metricas(self, metricas, resultado):
+        if not hasattr(self, "metricas_widgets"):
+            return
+        for clave, (lbl, pb) in self.metricas_widgets.items():
+            val = metricas.get(clave, 0.0)
+            lbl.config(text=f"{lbl.cget('text').split(':')[0]}: {val:.1f}%")
+            pb["value"] = val
+        self.lbl_categoria.config(
+            text=f"Perfil {resultado['categoria']} · {resultado['valor']:.1f}"
+        )
+        self.pb_recomendacion["value"] = resultado["valor"]
+
+    def calcular_metricas(self):
+        datos = self.datos_financieros
+        # usar últimos 90 días si hay fecha
+        if "fecha" in datos.columns and datos["fecha"].notna().any():
+            maxf = datos["fecha"].max()
+            ventana = maxf - pd.Timedelta(days=90)
+            sub = datos[datos["fecha"] >= ventana]
+            if sub.empty:
+                sub = datos
+        else:
+            sub = datos
+        ingreso_prom = sub["ingreso"].mean()
+        ahorro_prom = sub["ahorro"].mean()
+        gasto_ess_prom = sub["gasto_essencial"].mean()
+        estabilidad = 100 - (sub["ingreso"].std() / (ingreso_prom + 1e-9)) * 100
+        ratio_ahorro = (ahorro_prom / (ingreso_prom + 1e-9)) * 100
+        ratio_gasto_ess = (gasto_ess_prom / (ingreso_prom + 1e-9)) * 100
+        return {
+            "ratio_ahorro": float(np.clip(ratio_ahorro, 0, 100)),
+            "ratio_gasto_essencial": float(np.clip(ratio_gasto_ess, 0, 100)),
+            "estabilidad_ingresos": float(np.clip(estabilidad, 0, 100)),
+            "ingreso_promedio": float(ingreso_prom),
+            "ahorro_promedio": float(ahorro_prom),
+        }
+
+    def _preparar_dataset_neuro(self):
+        df = self.datos_financieros.copy()
+        if df.empty:
+            return None, None
+        if "fecha" in df.columns:
+            df = df.sort_values("fecha")
+        divisiones = max(len(df) // 15, 1)
+        bloques_idx = np.array_split(np.arange(len(df)), divisiones)
+        filas = []
+        for idx in bloques_idx:
+            bloque = df.iloc[idx]
+            if bloque.empty:
+                continue
+            ingreso = bloque["ingreso"].mean()
+            ahorro = bloque["ahorro"].mean()
+            gasto = bloque["gasto_essencial"].mean()
+            estabilidad = 100 - (bloque["ingreso"].std() / (ingreso + 1e-9)) * 100
+            feat = [
+                np.clip((ahorro / (ingreso + 1e-9)) * 100, 0, 100),
+                np.clip((gasto / (ingreso + 1e-9)) * 100, 0, 100),
+                np.clip(estabilidad, 0, 100),
+            ]
+            objetivo = (feat[0] * 0.5 + (100 - feat[1]) * 0.3 + feat[2] * 0.2) / 100
+            filas.append((feat, objetivo))
+        if not filas:
+            return None, None
+        X = np.array([f[0] for f in filas]) / 100.0
+        y = np.array([[f[1]] for f in filas])
+        return X, y
+
+    def _entrenar_neuro_modelo(self):
+        X, y = self._preparar_dataset_neuro()
+        if X is None:
+            self.neuro_modelo = None
+            return
+        self.neuro_modelo = MiniMLP(input_dim=X.shape[1], hidden_dim=6)
+        self.neuro_modelo.entrenar(X, y, epochs=400, lr=0.04)
+
+    def _inferir_neuro(self, metricas):
+        if self.neuro_modelo is None:
+            return metricas["ratio_ahorro"]
+        vector = np.array(
+            [
+                [
+                    metricas["ratio_ahorro"],
+                    metricas["ratio_gasto_essencial"],
+                    metricas["estabilidad_ingresos"],
+                ]
+            ]
+        )
+        pred = float(self.neuro_modelo.predecir(vector / 100.0)[0][0]) * 100
+        return float(np.clip(pred, 0, 100))
+
+    def _guardar_script_txt(self):
+        if filedialog is None:
+            messagebox.showwarning("Exportar", "filedialog no disponible")
+            return
+        destino = filedialog.asksaveasfilename(
+            title="Guardar script como .txt",
+            defaultextension=".txt",
+            filetypes=[("Archivo de texto", "*.txt")],
+        )
+        if destino:
+            try:
+                exportar_codigo_a_txt(destino)
+                messagebox.showinfo("Exportar", f"Archivo guardado en {destino}")
+            except Exception as exc:
+                messagebox.showerror("Exportar", f"No se pudo guardar: {exc}")
 
     def _graficas_gui(self):
         if plt is None or FigureCanvasTkAgg is None:
@@ -378,28 +722,44 @@ class AsistenteFinancieroDifuso:
             )
             return
         win = tk.Toplevel(self.root)
-        fig, ax = plt.subplots(2, 1, figsize=(8, 6))
-        d = self.datos_financieros
-        ax[0].plot(d["fecha"], d["ingreso"], label="Ingreso")
-        ax[0].plot(d["fecha"], d["gasto_essencial"], label="Gasto esencial")
-        ax[0].legend()
-        ax[0].tick_params(axis="x", rotation=45)
-        ratios = (d["ahorro"] / (d["ingreso"] + 1e-9)) * 100
-        ax[1].plot(d["fecha"], ratios, color="green", label="Ratio ahorro %")
-        ax[1].legend()
-        ax[1].tick_params(axis="x", rotation=45)
+        win.title("Análisis gráfico neuro-difuso")
+        fig, axes = plt.subplots(2, 2, figsize=(10, 6))
+        datos = self.datos_financieros
+        axes[0, 0].plot(datos["fecha"], datos["ingreso"], label="Ingreso")
+        axes[0, 0].plot(
+            datos["fecha"], datos["gasto_essencial"], label="Gasto esencial"
+        )
+        axes[0, 0].legend()
+        axes[0, 0].tick_params(axis="x", rotation=45)
+        axes[0, 1].plot(datos["fecha"], datos["ahorro"], color="green", label="Ahorro")
+        axes[0, 1].legend()
+        axes[0, 1].tick_params(axis="x", rotation=45)
+        ratios = (datos["ahorro"] / (datos["ingreso"] + 1e-9)) * 100
+        axes[1, 0].plot(datos["fecha"], ratios, color="purple", label="Ratio ahorro %")
+        axes[1, 0].legend()
+        axes[1, 0].tick_params(axis="x", rotation=45)
+        axes[1, 1].hist(datos["ingreso"], bins=15, color="orange", alpha=0.7)
+        axes[1, 1].set_title("Distribución ingresos")
         fig.tight_layout()
         canvas = FigureCanvasTkAgg(fig, win)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
 
 
+def exportar_codigo_a_txt(destino_path):
+    origen = os.path.abspath(__file__)
+    destino_dir = os.path.dirname(destino_path)
+    if destino_dir:
+        os.makedirs(destino_dir, exist_ok=True)
+    shutil.copyfile(origen, destino_path)
+
+
 # -------------------------
 # main
 # -------------------------
 def main():
-    # ruta_csv = r"c:\Users\omaroalvaradoc\Documents\Personal\Proyectos\CURSO IA\data\raw\Datos Movimientos Financieros.csv"
-    ruta_csv = ""
+    ruta_csv = r"c:\Users\omaroalvaradoc\Documents\Personal\Proyectos\CURSO IA\data\raw\Datos Movimientos Financieros.csv"
+    # ruta_csv = ""
 
     # Modo: podemos forzar GUI/console con argumentos o elegir interactivamente si está en un TTY.
     mode = None

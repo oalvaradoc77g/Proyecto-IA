@@ -32,7 +32,67 @@ except Exception as e:
     ctrl = None
 
 
+# Mini MLP simple para componente neuronal
+# MLP es Multi-Layer Perceptron (Perceptrón Multicapa)
+class MiniMLP:
+    # Inicializa pesos y biases
+    # biases son vectores añadidos a cada capa
+    # hidden es 6 debido a que es un tamaño común para una capa oculta pequeña
+    # seed es 42 porque es un valor común para reproducibilidad
+    def __init__(self, input_dim, hidden_dim=6, seed=42):
+        rng = np.random.default_rng(seed)
+        self.W1 = rng.normal(scale=0.1, size=(input_dim, hidden_dim))
+        self.b1 = np.zeros(hidden_dim)
+        self.W2 = rng.normal(scale=0.1, size=(hidden_dim, 1))
+        self.b2 = np.zeros(1)
+
+    # Funciones de activación y derivadas
+    def _relu(self, x):
+        return np.maximum(0, x)
+
+    # Derivada de ReLU se encarga de retornar 1 donde x>0, 0 en otro caso, x es la entrada pre-activación
+    def _relu_deriv(self, x):
+        return (x > 0).astype(float)
+
+    # Función sigmoide para salida entre 0 y 1
+    def _sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
+
+    # Entrenamiento con descenso de gradiente
+    # epochs es la cantidad de iteraciones para entrenar se deja 400 porque es un valor común para un entrenamiento rápido
+    # lr es la tasa de aprendizaje se deja 0.04 porque es un valor común para un entrenamiento rápido
+    # X es la matriz de características de entrada
+    # y es el vector de etiquetas o valores objetivo
+    def entrenar(self, X, y, epochs=400, lr=0.04):
+        if len(X) == 0:
+            return
+        for _ in range(epochs):
+            z1 = X @ self.W1 + self.b1
+            a1 = self._relu(z1)
+            z2 = a1 @ self.W2 + self.b2
+            y_pred = self._sigmoid(z2)
+            err = y_pred - y
+            grad_W2 = a1.T @ err / len(X)
+            grad_b2 = err.mean(axis=0)
+            da1 = err @ self.W2.T
+            dz1 = da1 * self._relu_deriv(z1)
+            grad_W1 = X.T @ dz1 / len(X)
+            grad_b1 = dz1.mean(axis=0)
+            self.W2 -= lr * grad_W2
+            self.b2 -= lr * grad_b2
+            self.W1 -= lr * grad_W1
+            self.b1 -= lr * grad_b1
+
+    # Predicción usando la red neuronal entrenada
+    def predecir(self, X):
+        z1 = X @ self.W1 + self.b1
+        a1 = self._relu(z1)
+        z2 = a1 @ self.W2 + self.b2
+        return self._sigmoid(z2)
+
+
 class AsistenteFinancieroDifuso:
+    # Clase principal para el asistente financiero con lógica difusa y componente neuronal
     def __init__(self, root=None, datos_externos=None):
         """
         root: objeto Tk (si se desea GUI). Si es None, el asistente funciona en modo consola.
@@ -42,6 +102,12 @@ class AsistenteFinancieroDifuso:
         """
         self.root = root
         self.datos_financieros = None
+        self.origen_datos = "Simulado"
+        if isinstance(datos_externos, pd.DataFrame):
+            self.origen_datos = "DataFrame externo"
+        elif isinstance(datos_externos, str) and os.path.exists(datos_externos):
+            self.origen_datos = "CSV"
+        self.neuro_modelo = None
 
         # Validar disponibilidad de skfuzzy
         if fuzz is None or ctrl is None:
@@ -120,6 +186,7 @@ class AsistenteFinancieroDifuso:
         # Sistema difuso
         self.sistema_control = None
         self.crear_sistema_difuso()
+        self.crear_modelo_neuronal()
 
         # Crear GUI si se pidió
         if self.root is not None:
@@ -127,6 +194,7 @@ class AsistenteFinancieroDifuso:
                 raise RuntimeError("Tkinter no está disponible en este entorno")
             self.crear_interfaz()
 
+    # Generar datos simulados
     def generar_datos_simulados(self, dias=90):
         """Genera datos financieros simulados (diarios) y devuelve DataFrame."""
         fechas = [datetime.now() - timedelta(days=x) for x in range(dias)]
@@ -147,6 +215,7 @@ class AsistenteFinancieroDifuso:
             )
         return pd.DataFrame(datos)
 
+    # Crear sistema difuso
     def crear_sistema_difuso(self):
         """Construye el sistema de lógica difusa (mismas reglas y membresías mejoradas)."""
         # Variables de entrada
@@ -235,6 +304,7 @@ class AsistenteFinancieroDifuso:
         )
         self.sistema_control = ctrl.ControlSystemSimulation(sistema_recomendacion)
 
+    # Calcular métricas financieras
     def calcular_metricas(self):
         """Calcula métricas a partir del DataFrame interno. Retorna dict."""
         datos = self.datos_financieros.copy()
@@ -287,10 +357,65 @@ class AsistenteFinancieroDifuso:
             "ahorro_promedio": float(ahorro_promedio),
         }
 
+    # Crear modelo neuronal
+    def crear_modelo_neuronal(self):
+        X, y = self._preparar_dataset_neuro()
+        if X is None:
+            self.neuro_modelo = None
+            return
+        self.neuro_modelo = MiniMLP(input_dim=X.shape[1], hidden_dim=6)
+        self.neuro_modelo.entrenar(X, y, epochs=450, lr=0.03)
+
+    # Preparar dataset para componente neuronal
+    def _preparar_dataset_neuro(self):
+        df = self.datos_financieros.copy()
+        if df.empty:
+            return None, None
+        if "fecha" in df.columns:
+            df = df.sort_values("fecha")
+        divisiones = max(len(df) // 15, 1)
+        bloques_idx = np.array_split(np.arange(len(df)), divisiones)
+        payload = []
+        for idx in bloques_idx:
+            bloque = df.iloc[idx]
+            if bloque.empty:
+                continue
+            ingreso = bloque["ingreso"].mean()
+            ahorro = bloque["ahorro"].mean()
+            gasto = bloque["gasto_essencial"].mean()
+            estabilidad = 100 - (bloque["ingreso"].std() / (ingreso + 1e-9)) * 100
+            feat = [
+                np.clip((ahorro / (ingreso + 1e-9)) * 100, 0, 100),
+                np.clip((gasto / (ingreso + 1e-9)) * 100, 0, 100),
+                np.clip(estabilidad, 0, 100),
+            ]
+            objetivo = (feat[0] * 0.5 + (100 - feat[1]) * 0.3 + feat[2] * 0.2) / 100
+            payload.append((feat, objetivo))
+        if not payload:
+            return None, None
+        X = np.array([p[0] for p in payload]) / 100.0
+        y = np.array([[p[1]] for p in payload])
+        return X, y
+
+    # Inferir recomendación con componente neuronal
+    def _inferir_neuro(self, metricas):
+        if self.neuro_modelo is None:
+            return metricas["ratio_ahorro"]
+        v = np.array(
+            [
+                [
+                    metricas["ratio_ahorro"],
+                    metricas["ratio_gasto_essencial"],
+                    metricas["estabilidad_ingresos"],
+                ]
+            ]
+        )
+        pred = float(self.neuro_modelo.predecir(v / 100.0)[0][0]) * 100
+        return float(np.clip(pred, 0, 100))
+
+    # Obtener recomendación final
     def obtener_recomendacion(self):
-        """Ejecuta el sistema difuso y retorna un diccionario con resultado y texto explicativo."""
         metricas = self.calcular_metricas()
-        # asignar entradas
         self.sistema_control.input["ratio_ahorro"] = metricas["ratio_ahorro"]
         self.sistema_control.input["ratio_gasto_essencial"] = metricas[
             "ratio_gasto_essencial"
@@ -298,17 +423,18 @@ class AsistenteFinancieroDifuso:
         self.sistema_control.input["estabilidad_ingresos"] = metricas[
             "estabilidad_ingresos"
         ]
-        # compute
         self.sistema_control.compute()
-        valor_recomendacion = float(self.sistema_control.output["recomendacion"])
+        valor_difuso = float(self.sistema_control.output["recomendacion"])
+        valor_neuronal = self._inferir_neuro(metricas)
+        valor_final = (valor_difuso * 0.6) + (valor_neuronal * 0.4)
         # Categoría y explicación (mismos textos, retornan en string)
-        if valor_recomendacion <= 30:
+        if valor_final <= 30:
             categoria = "EMERGENCIA"
             explicacion = "Acciones: recortar gastos no esenciales, crear fondo de emergencia, revisar deudas."
-        elif valor_recomendacion <= 60:
+        elif valor_final <= 60:
             categoria = "CONSERVADOR"
             explicacion = "Acciones: mantener ahorro, instrumentos de bajo riesgo, construir fondo 3-6 meses."
-        elif valor_recomendacion <= 80:
+        elif valor_final <= 80:
             categoria = "MODERADO"
             explicacion = "Acciones: incrementar inversiones, considerar riesgo medio, plan largo plazo."
         else:
@@ -316,7 +442,9 @@ class AsistenteFinancieroDifuso:
             explicacion = "Acciones: diversificar agresivamente, aprovechar alta capacidad de ahorro."
         return {
             "categoria": categoria,
-            "valor": valor_recomendacion,
+            "valor": valor_final,
+            "valor_difuso": valor_difuso,
+            "valor_neuronal": valor_neuronal,
             "explicacion": explicacion,
             "metricas": metricas,
         }
@@ -364,24 +492,38 @@ class AsistenteFinancieroDifuso:
         )
         btn_analizar.grid(row=1, column=0, columnspan=3, pady=10, sticky="ew")
 
+        ttk.Label(
+            main_frame, text=f"Fuente de datos: {self.origen_datos}", font=("Arial", 10)
+        ).grid(row=1, column=0, columnspan=3, sticky="w")
+        self.lbl_estado = ttk.Label(
+            main_frame,
+            text="Score neuro-difuso pendiente",
+            font=("Arial", 12, "bold"),
+            foreground="#1c5d99",
+        )
+        self.lbl_estado.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(5, 0))
+        self.pb_estado = ttk.Progressbar(main_frame, maximum=100)
+        self.pb_estado.grid(row=3, column=0, columnspan=3, sticky="ew", pady=5)
+
         frame_metricas = ttk.LabelFrame(
             main_frame, text="📊 Métricas Financieras", padding="10"
         )
-        frame_metricas.grid(row=2, column=0, columnspan=3, sticky="ew", pady=10)
+        frame_metricas.grid(row=4, column=0, columnspan=3, sticky="ew", pady=10)
         frame_metricas.columnconfigure(1, weight=1)
 
         self.texto_resultados = scrolledtext.ScrolledText(
             main_frame, width=80, height=20, font=("Consolas", 10), wrap=tk.WORD
         )
-        self.texto_resultados.grid(row=3, column=0, columnspan=3, sticky="ew", pady=10)
+        self.texto_resultados.grid(row=5, column=0, columnspan=3, sticky="ew", pady=10)
 
         btn_graficas = ttk.Button(
             main_frame, text="📈 Ver Análisis Gráfico", command=self.mostrar_graficas
         )
-        btn_graficas.grid(row=4, column=0, columnspan=3, pady=10, sticky="ew")
+        btn_graficas.grid(row=6, column=0, columnspan=3, pady=10, sticky="ew")
 
         self.configurar_estilos()
 
+    # Configurar estilos para la interfaz gráfica
     def configurar_estilos(self):
         style = ttk.Style()
         try:
@@ -396,6 +538,7 @@ class AsistenteFinancieroDifuso:
         )
         style.configure("Accent.TButton", font=("Arial", 11, "bold"))
 
+    # Mostrar análisis en GUI
     def _mostrar_analisis_gui(self):
         resultado = self.obtener_recomendacion()
         if resultado:
@@ -416,7 +559,17 @@ class AsistenteFinancieroDifuso:
             )
             self.texto_resultados.delete(1.0, tk.END)
             self.texto_resultados.insert(1.0, reporte)
+            self._actualizar_estado_gui(resultado)
 
+    # Actualizar estado en GUI
+    def _actualizar_estado_gui(self, resultado):
+        if hasattr(self, "pb_estado"):
+            self.lbl_estado.config(
+                text=f"Perfil {resultado['categoria']} · {resultado['valor']:.1f}"
+            )
+            self.pb_estado["value"] = resultado["valor"]
+
+    # Mostrar gráficas en GUI
     def mostrar_graficas(self):
         """Dibuja gráficas en ventana nueva (solo GUI)."""
         if self.root is None:
@@ -509,4 +662,8 @@ class AsistenteFinancieroDifuso:
         print(f"Ahorro Promedio: ${metricas['ahorro_promedio']:.2f}")
         print(f"Recomendación: {resultado['categoria']} ({resultado['valor']:.1f})")
         print(resultado["explicacion"])
+        print("=" * 80)
+        print(
+            f"Componentes -> Difuso: {resultado['valor_difuso']:.1f} | Neuronal: {resultado['valor_neuronal']:.1f}"
+        )
         print("=" * 80)
