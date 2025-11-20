@@ -204,6 +204,7 @@ class MiniMLP:
 # Clase: AsistenteFinancieroDifuso (modo consola + opcional GUI)
 # -------------------------
 class AsistenteFinancieroDifuso:
+    # Inicializa el asistente financiero difuso
     def __init__(self, datos_df=None, root=None):
         if fuzz is None or ctrl is None:
             raise ImportError(
@@ -228,6 +229,7 @@ class AsistenteFinancieroDifuso:
                 raise RuntimeError("Tkinter no disponible en este entorno")
             self._crear_interfaz()
 
+    # Entrena el modelo neuronal con datos históricos simulados
     def _generar_simulados(self, dias=90):
         fechas = [datetime.now() - timedelta(days=x) for x in range(dias)]
         datos = []
@@ -247,6 +249,7 @@ class AsistenteFinancieroDifuso:
             )
         return pd.DataFrame(datos)
 
+    # Asegura que los tipos de datos en el DataFrame sean correctos
     def _asegurar_tipos(self):
         if "fecha" in self.datos_financieros.columns:
             self.datos_financieros["fecha"] = pd.to_datetime(
@@ -260,6 +263,7 @@ class AsistenteFinancieroDifuso:
             else:
                 self.datos_financieros[c] = 0.0
 
+    # Crea el sistema difuso para la toma de decisiones financieras
     def _crear_sistema_difuso(self):
         # entradas
         self.ratio_ahorro = ctrl.Antecedent(np.arange(0, 101, 1), "ratio_ahorro")
@@ -344,6 +348,7 @@ class AsistenteFinancieroDifuso:
         self.ctrl_system = ctrl.ControlSystem(reglas)
         self.sim = ctrl.ControlSystemSimulation(self.ctrl_system)
 
+    # Entrena el modelo neuronal con datos históricos simulados
     def calcular_metricas(self):
         datos = self.datos_financieros
         # usar últimos 90 días si hay fecha
@@ -369,6 +374,7 @@ class AsistenteFinancieroDifuso:
             "ahorro_promedio": float(ahorro_prom),
         }
 
+    # Inferencia con el modelo neuronal
     def obtener_recomendacion(self):
         metricas = self.calcular_metricas()
         self.sim.input["ratio_ahorro"] = metricas["ratio_ahorro"]
@@ -470,6 +476,7 @@ class AsistenteFinancieroDifuso:
             btn_g = ttk.Button(frame, text="Ver gráficas", command=self._graficas_gui)
             btn_g.pack(fill="x", pady=5)
 
+    # Acción al presionar el botón en la GUI
     def _accion_gui(self):
         r = self.obtener_recomendacion()
         self.ultimo_resultado = r
@@ -490,6 +497,7 @@ class AsistenteFinancieroDifuso:
         self.txt.insert("1.0", reporte)
         self._actualizar_panel_metricas(m, r)
 
+    # Explicación detallada de los componentes
     def _actualizar_panel_metricas(self, metricas, resultado):
         if not hasattr(self, "metricas_widgets"):
             return
@@ -503,6 +511,7 @@ class AsistenteFinancieroDifuso:
         )
         self.pb_recomendacion["value"] = resultado["valor"]
 
+    # Explicación de los componentes difuso y neuronal
     def _mostrar_info_ratio(self):
         mensaje = (
             "Ratio de Ahorro = (Ahorro promedio / Ingreso promedio) * 100.\n"
@@ -514,6 +523,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación de los componentes difuso y neuronal
     def _mostrar_info_gasto(self):
         mensaje = (
             "Gasto Esencial % = (Gasto esencial / Ingreso promedio) * 100.\n"
@@ -526,6 +536,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación de los componentes difuso y neuronal
     def _mostrar_info_estabilidad(self):
         mensaje = (
             "Estabilidad de Ingresos calcula la variación de tus ingresos recientes.\n"
@@ -537,6 +548,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación del perfil financiero
     def _mostrar_info_perfil(self):
         if self.ultimo_resultado:
             res = self.ultimo_resultado
@@ -554,6 +566,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación detallada de los componentes
     def obtener_recomendacion(self):
         metricas = self.calcular_metricas()
         self.sim.input["ratio_ahorro"] = metricas["ratio_ahorro"]
@@ -655,6 +668,7 @@ class AsistenteFinancieroDifuso:
             btn_g = ttk.Button(frame, text="Ver gráficas", command=self._graficas_gui)
             btn_g.pack(fill="x", pady=5)
 
+    # Acción al presionar el botón en la GUI
     def _accion_gui(self):
         r = self.obtener_recomendacion()
         self.ultimo_resultado = r
@@ -675,6 +689,7 @@ class AsistenteFinancieroDifuso:
         self.txt.insert("1.0", reporte)
         self._actualizar_panel_metricas(m, r)
 
+    # Actualiza el panel de métricas en la GUI
     def _actualizar_panel_metricas(self, metricas, resultado):
         if not hasattr(self, "metricas_widgets"):
             return
@@ -688,6 +703,7 @@ class AsistenteFinancieroDifuso:
         )
         self.pb_recomendacion["value"] = resultado["valor"]
 
+    # Explicación detallada de los componentes
     def _mostrar_info_ratio(self):
         mensaje = (
             "Ratio de Ahorro = (Ahorro promedio / Ingreso promedio) * 100.\n"
@@ -699,6 +715,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación detallada de los componentes
     def _mostrar_info_gasto(self):
         mensaje = (
             "Gasto Esencial % = (Gasto esencial / Ingreso promedio) * 100.\n"
@@ -711,6 +728,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación detallada de los componentes
     def _mostrar_info_estabilidad(self):
         mensaje = (
             "Estabilidad de Ingresos calcula la variación de tus ingresos recientes.\n"
@@ -722,6 +740,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación del perfil financiero
     def _mostrar_info_perfil(self):
         if self.ultimo_resultado:
             res = self.ultimo_resultado
@@ -739,6 +758,7 @@ class AsistenteFinancieroDifuso:
             else print(mensaje)
         )
 
+    # Explicación detallada de los componentes
     def _explicar_componentes(self, resultado):
         difuso = resultado["valor_difuso"]
         neuronal = resultado["valor_neuronal"]
@@ -756,6 +776,7 @@ class AsistenteFinancieroDifuso:
             )
         return f"Interpretación del score -> Difuso: {difuso:.1f} vs Neuronal: {neuronal:.1f}. {motivo}"
 
+    # Acción al presionar el botón en la GUI
     def calcular_metricas(self):
         datos = self.datos_financieros
         # usar últimos 90 días si hay fecha
@@ -781,6 +802,7 @@ class AsistenteFinancieroDifuso:
             "ahorro_promedio": float(ahorro_prom),
         }
 
+    # Preparar dataset para el modelo neuronal
     def _preparar_dataset_neuro(self):
         df = self.datos_financieros.copy()
         if df.empty:
@@ -811,6 +833,7 @@ class AsistenteFinancieroDifuso:
         y = np.array([[f[1]] for f in filas])
         return X, y
 
+    # Entrenar el modelo neuronal
     def _entrenar_neuro_modelo(self):
         X, y = self._preparar_dataset_neuro()
         if X is None:
@@ -819,6 +842,7 @@ class AsistenteFinancieroDifuso:
         self.neuro_modelo = MiniMLP(input_dim=X.shape[1], hidden_dim=6)
         self.neuro_modelo.entrenar(X, y, epochs=400, lr=0.04)
 
+    # Inferencia con el modelo neuronal
     def _inferir_neuro(self, metricas):
         if self.neuro_modelo is None:
             return metricas["ratio_ahorro"]
@@ -834,22 +858,7 @@ class AsistenteFinancieroDifuso:
         pred = float(self.neuro_modelo.predecir(vector / 100.0)[0][0]) * 100
         return float(np.clip(pred, 0, 100))
 
-    def _guardar_script_txt(self):
-        if filedialog is None:
-            messagebox.showwarning("Exportar", "filedialog no disponible")
-            return
-        destino = filedialog.asksaveasfilename(
-            title="Guardar script como .txt",
-            defaultextension=".txt",
-            filetypes=[("Archivo de texto", "*.txt")],
-        )
-        if destino:
-            try:
-                exportar_codigo_a_txt(destino)
-                messagebox.showinfo("Exportar", f"Archivo guardado en {destino}")
-            except Exception as exc:
-                messagebox.showerror("Exportar", f"No se pudo guardar: {exc}")
-
+    # Mostrar gráficas en una ventana nueva
     def _graficas_gui(self):
         if plt is None or FigureCanvasTkAgg is None:
             messagebox.showwarning(
@@ -864,29 +873,168 @@ class AsistenteFinancieroDifuso:
         axes[0, 0].plot(
             datos["fecha"], datos["gasto_essencial"], label="Gasto esencial"
         )
+        axes[0, 0].set_title("Ingresos vs gasto esencial")
         axes[0, 0].legend()
         axes[0, 0].tick_params(axis="x", rotation=45)
+
         axes[0, 1].plot(datos["fecha"], datos["ahorro"], color="green", label="Ahorro")
+        axes[0, 1].set_title("Ahorro acumulado")
         axes[0, 1].legend()
         axes[0, 1].tick_params(axis="x", rotation=45)
+
         ratios = (datos["ahorro"] / (datos["ingreso"] + 1e-9)) * 100
         axes[1, 0].plot(datos["fecha"], ratios, color="purple", label="Ratio ahorro %")
+        axes[1, 0].set_title("Ratio de ahorro (%)")
         axes[1, 0].legend()
         axes[1, 0].tick_params(axis="x", rotation=45)
+
         axes[1, 1].hist(datos["ingreso"], bins=15, color="orange", alpha=0.7)
         axes[1, 1].set_title("Distribución ingresos")
         fig.tight_layout()
         canvas = FigureCanvasTkAgg(fig, win)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True)
+        btns_frame = ttk.Frame(win)
+        btns_frame.pack(fill="x", pady=4)
+        ttk.Button(
+            btns_frame,
+            text="ℹ Ingresos vs gasto",
+            command=lambda: self._explicar_ingresos_gasto(datos),
+        ).pack(side="left", expand=True, fill="x", padx=2)
+        ttk.Button(
+            btns_frame,
+            text="ℹ Ahorro acumulado",
+            command=lambda: self._explicar_ahorro(datos),
+        ).pack(side="left", expand=True, fill="x", padx=2)
+        ttk.Button(
+            btns_frame,
+            text="ℹ Ratio ahorro",
+            command=lambda: self._explicar_ratio(datos),
+        ).pack(side="left", expand=True, fill="x", padx=2)
+        ttk.Button(
+            btns_frame,
+            text="ℹ Distribución ingresos",
+            command=lambda: self._explicar_histograma_dyn(datos),
+        ).pack(side="left", expand=True, fill="x", padx=2)
 
+    # Explicación del perfil financiero
+    def _explicar_ingresos_gasto(self, datos):
+        total_ing = float(datos["ingreso"].sum())
+        ess = float(datos["gasto_essencial"].sum())
+        pct_ess = (ess / (total_ing + 1e-9)) * 100
+        mensaje = (
+            "Ingresos vs gasto esencial:\n\n"
+            f"Ingreso total observado: ${total_ing:,.0f}\n"
+            f"Gasto esencial total: ${ess:,.0f} ({pct_ess:.1f}% del ingreso)\n\n"
+            "Interpretación: un porcentaje elevado del ingreso destinado a gastos básicos reduce margen de ahorro."
+        )
+        (
+            messagebox.showinfo("Ingresos vs gasto esencial", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
 
-def exportar_codigo_a_txt(destino_path):
-    origen = os.path.abspath(__file__)
-    destino_dir = os.path.dirname(destino_path)
-    if destino_dir:
-        os.makedirs(destino_dir, exist_ok=True)
-    shutil.copyfile(origen, destino_path)
+    # Explicación del perfil financiero
+    def _explicar_ahorro(self, datos):
+        ahorros = datos["ahorro"].astype(float)
+        prom = ahorros.mean()
+        med = ahorros.median()
+        tendencia = "estable" if ahorros.std() < prom * 0.25 else "variable"
+        mensaje = (
+            "Ahorro acumulado:\n\n"
+            f"Ahorro medio diario: ${prom:,.0f}\n"
+            f"Ahorro mediano diario: ${med:,.0f}\n"
+            f"Variabilidad: {tendencia}\n\n"
+            "Interpretación: revisar consistencia; si es variable, conviene calendarizar aportes."
+        )
+        (
+            messagebox.showinfo("Ahorro acumulado", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    # Explicación del perfil financiero
+    def _explicar_ratio(self, datos):
+        ratios = (datos["ahorro"] / (datos["ingreso"] + 1e-9)) * 100
+        prom = ratios.mean()
+        med = np.median(ratios)
+        maxv = ratios.max()
+        mensaje = (
+            "Ratio de ahorro (% sobre ingreso):\n\n"
+            f"Promedio: {prom:.1f}%\n"
+            f"Mediana: {med:.1f}%\n"
+            f"Máximo observado: {maxv:.1f}%\n\n"
+            "Interpretación: valores crecientes indican mejora; bajo promedio sugiere optimizar gastos no esenciales."
+        )
+        (
+            messagebox.showinfo("Ratio de ahorro", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    # Explicación del perfil financiero
+    def _generar_explicacion_histograma(self, datos):
+        ingresos = datos.get("ingreso", pd.Series(dtype=float)).astype(float).dropna()
+        if ingresos.empty:
+            return "No hay datos suficientes para analizar la distribución."
+        rangos = [
+            (0, 10_000_000, "0-10M"),
+            (10_000_000, 20_000_000, "10-20M"),
+            (20_000_000, 30_000_000, "20-30M"),
+            (30_000_000, 40_000_000, "30-40M"),
+            (40_000_000, None, "40M+"),
+        ]
+        lineas = []
+        for low, high, etiqueta in rangos:
+            if high is None:
+                mask = ingresos >= low
+            else:
+                mask = (ingresos >= low) & (ingresos < high)
+            count = int(mask.sum())
+            if count == 0:
+                cuali = "rango ausente"
+            elif count <= 2:
+                cuali = "ocasional"
+            elif count <= 5:
+                cuali = "frecuencia media"
+            else:
+                cuali = "muy frecuente"
+            lineas.append(f"• {etiqueta}: {count} registros ({cuali})")
+        pico = ingresos.median()
+        resumen = (
+            f"Mediana aproximada: ${pico:,.0f}. Concentración principal cerca de "
+            f"{self._etiqueta_rango(pico)}."
+        )
+        return (
+            "📊 Distribución de ingresos (histograma)\n\n"
+            "Eje X: montos en pesos.\nEje Y: frecuencia de aparición en cada rango.\n\n"
+            + "\n".join(lineas)
+            + "\n\n"
+            + resumen
+        )
+
+    # Explicación del perfil financiero
+    def _etiqueta_rango(self, valor):
+        if valor < 10_000_000:
+            return "0-10M"
+        if valor < 20_000_000:
+            return "10-20M"
+        if valor < 30_000_000:
+            return "20-30M"
+        if valor < 40_000_000:
+            return "30-40M"
+        return "40M+"
+
+    # Explicación del perfil financiero
+    def _explicar_histograma_dyn(self, datos):
+        mensaje = self._generar_explicacion_histograma(datos)
+        (
+            messagebox.showinfo("Distribución de ingresos", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    # Guardar script como archivo de texto
 
 
 # -------------------------
