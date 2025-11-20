@@ -484,10 +484,24 @@ class AsistenteFinancieroDifuso:
             f"Recomendación: {r['categoria']} ({r['valor']:.1f})\n"
             f"  · Difuso: {r['valor_difuso']:.1f} | Neuronal: {r['valor_neuronal']:.1f}\n"
             f"{r['explicacion']}\n"
+            f"{self._explicar_componentes(r)}\n"
         )
         self.txt.delete("1.0", "end")
         self.txt.insert("1.0", reporte)
         self._actualizar_panel_metricas(m, r)
+
+    def _actualizar_panel_metricas(self, metricas, resultado):
+        if not hasattr(self, "metricas_widgets"):
+            return
+        for clave, (lbl, pb) in self.metricas_widgets.items():
+            valor = metricas.get(clave, 0.0)
+            titulo = lbl.cget("text").split(":")[0]
+            lbl.config(text=f"{titulo}: {valor:.1f}%")
+            pb["value"] = valor
+        self.lbl_categoria.config(
+            text=f"Perfil {resultado['categoria']} · {resultado['valor']:.1f}"
+        )
+        self.pb_recomendacion["value"] = resultado["valor"]
 
     def _mostrar_info_ratio(self):
         mensaje = (
@@ -655,10 +669,24 @@ class AsistenteFinancieroDifuso:
             f"Recomendación: {r['categoria']} ({r['valor']:.1f})\n"
             f"  · Difuso: {r['valor_difuso']:.1f} | Neuronal: {r['valor_neuronal']:.1f}\n"
             f"{r['explicacion']}\n"
+            f"{self._explicar_componentes(r)}\n"
         )
         self.txt.delete("1.0", "end")
         self.txt.insert("1.0", reporte)
         self._actualizar_panel_metricas(m, r)
+
+    def _actualizar_panel_metricas(self, metricas, resultado):
+        if not hasattr(self, "metricas_widgets"):
+            return
+        for clave, (lbl, pb) in self.metricas_widgets.items():
+            valor = metricas.get(clave, 0.0)
+            titulo = lbl.cget("text").split(":")[0]
+            lbl.config(text=f"{titulo}: {valor:.1f}%")
+            pb["value"] = valor
+        self.lbl_categoria.config(
+            text=f"Perfil {resultado['categoria']} · {resultado['valor']:.1f}"
+        )
+        self.pb_recomendacion["value"] = resultado["valor"]
 
     def _mostrar_info_ratio(self):
         mensaje = (
@@ -710,6 +738,23 @@ class AsistenteFinancieroDifuso:
             if messagebox
             else print(mensaje)
         )
+
+    def _explicar_componentes(self, resultado):
+        difuso = resultado["valor_difuso"]
+        neuronal = resultado["valor_neuronal"]
+        if abs(difuso - neuronal) <= 3:
+            motivo = "Ambos módulos coinciden: las reglas difusas y la red neuronal ven un perfil similar."
+        elif difuso > neuronal:
+            motivo = (
+                "El componente difuso domina porque las métricas actuales encajan mejor con las reglas "
+                "de ahorro, gasto esencial y estabilidad predefinidas."
+            )
+        else:
+            motivo = (
+                "El componente neuronal domina al detectar patrones recientes que sugieren "
+                "un comportamiento distinto al esperado por las reglas difusas."
+            )
+        return f"Interpretación del score -> Difuso: {difuso:.1f} vs Neuronal: {neuronal:.1f}. {motivo}"
 
     def calcular_metricas(self):
         datos = self.datos_financieros
