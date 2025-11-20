@@ -18,3 +18,5 @@ joblib>=1.2.0
 requests>=2.28.0  # Para llamadas API
 yfinance>=0.2.0  # Para datos de la bolsa de valores
 faker>=18.0.0  # Para generar datos realistas de comercio
+networkx>=3.0  # requerida por scikit-fuzzy control
+scikit-fuzzy>=0.5.0
