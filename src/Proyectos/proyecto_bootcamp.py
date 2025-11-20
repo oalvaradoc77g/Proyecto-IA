@@ -219,6 +219,7 @@ class AsistenteFinancieroDifuso:
         )
         self.origen_datos = "CSV" if isinstance(datos_df, pd.DataFrame) else "Simulado"
         self.neuro_modelo = None
+        self.ultimo_resultado = None
         self._asegurar_tipos()
         self._crear_sistema_difuso()
         self._entrenar_neuro_modelo()
@@ -431,6 +432,11 @@ class AsistenteFinancieroDifuso:
         tablero = ttk.LabelFrame(frame, text="Panel Neuro-Difuso", padding=10)
         tablero.pack(fill="x", pady=5)
         self.metricas_widgets = {}
+        info_map = {
+            "ratio_ahorro": self._mostrar_info_ratio,
+            "ratio_gasto_essencial": self._mostrar_info_gasto,
+            "estabilidad_ingresos": self._mostrar_info_estabilidad,
+        }
         for idx, (clave, texto) in enumerate(
             [
                 ("ratio_ahorro", "Ratio de Ahorro"),
@@ -442,31 +448,31 @@ class AsistenteFinancieroDifuso:
             fila.grid(row=idx, column=0, sticky="ew", pady=2)
             lbl = ttk.Label(fila, text=f"{texto}: --")
             lbl.pack(side="left")
-            if clave == "ratio_ahorro":
-                ttk.Button(
-                    fila,
-                    text="?",
-                    width=2,
-                    command=self._mostrar_info_ratio,
-                ).pack(side="left", padx=(6, 0))
+            if clave in info_map:
+                ttk.Button(fila, text="?", width=2, command=info_map[clave]).pack(
+                    side="left", padx=(6, 0)
+                )
             pb = ttk.Progressbar(fila, maximum=100, length=220)
             pb.pack(side="right", padx=5)
             self.metricas_widgets[clave] = (lbl, pb)
+        cont_categoria = ttk.Frame(tablero)
+        cont_categoria.grid(row=3, column=0, sticky="w", pady=(8, 2))
         self.lbl_categoria = ttk.Label(
-            tablero, text="Perfil pendiente", font=("Arial", 12, "bold")
+            cont_categoria, text="Perfil pendiente", font=("Arial", 12, "bold")
         )
-        self.lbl_categoria.grid(row=3, column=0, sticky="w", pady=(8, 2))
+        self.lbl_categoria.pack(side="left")
+        ttk.Button(
+            cont_categoria, text="?", width=2, command=self._mostrar_info_perfil
+        ).pack(side="left", padx=(6, 0))
         self.pb_recomendacion = ttk.Progressbar(tablero, maximum=100, length=320)
         self.pb_recomendacion.grid(row=4, column=0, sticky="ew")
-        ttk.Button(
-            frame, text="💾 Exportar código .txt", command=self._guardar_script_txt
-        ).pack(fill="x", pady=5)
         if plt is not None:
             btn_g = ttk.Button(frame, text="Ver gráficas", command=self._graficas_gui)
             btn_g.pack(fill="x", pady=5)
 
     def _accion_gui(self):
         r = self.obtener_recomendacion()
+        self.ultimo_resultado = r
         m = r["metricas"]
         reporte = (
             f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
@@ -486,13 +492,53 @@ class AsistenteFinancieroDifuso:
     def _mostrar_info_ratio(self):
         mensaje = (
             "Ratio de Ahorro = (Ahorro promedio / Ingreso promedio) * 100.\n"
-            "Valores altos indican mayor capacidad para cubrir imprevistos "
-            "y asumir estrategias de inversión más agresivas."
+            "Un porcentaje alto implica holgura financiera y resiliencia ante emergencias."
         )
-        if messagebox is not None:
+        (
             messagebox.showinfo("¿Qué es el Ratio de Ahorro?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_gasto(self):
+        mensaje = (
+            "Gasto Esencial % = (Gasto esencial / Ingreso promedio) * 100.\n"
+            "Describe cuánto de tus ingresos se dirige a necesidades básicas; "
+            "superar 60% suele limitar el ahorro."
+        )
+        (
+            messagebox.showinfo("¿Qué es el Gasto Esencial?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_estabilidad(self):
+        mensaje = (
+            "Estabilidad de Ingresos calcula la variación de tus ingresos recientes.\n"
+            "Valores cercanos a 100% significan ingresos consistentes; bajos implican volatilidad."
+        )
+        (
+            messagebox.showinfo("¿Qué es la Estabilidad de Ingresos?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_perfil(self):
+        if self.ultimo_resultado:
+            res = self.ultimo_resultado
+            mensaje = (
+                f"Perfil {res['categoria']} ({res['valor']:.1f}).\n"
+                f"Componente difuso: {res['valor_difuso']:.1f}\n"
+                f"Componente neuronal: {res['valor_neuronal']:.1f}\n\n"
+                f"{res['explicacion']}"
+            )
         else:
-            print(mensaje)
+            mensaje = "Realiza un análisis primero para obtener tu perfil financiero."
+        (
+            messagebox.showinfo("Detalle del Perfil", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
 
     def obtener_recomendacion(self):
         metricas = self.calcular_metricas()
@@ -557,6 +603,11 @@ class AsistenteFinancieroDifuso:
         tablero = ttk.LabelFrame(frame, text="Panel Neuro-Difuso", padding=10)
         tablero.pack(fill="x", pady=5)
         self.metricas_widgets = {}
+        info_map = {
+            "ratio_ahorro": self._mostrar_info_ratio,
+            "ratio_gasto_essencial": self._mostrar_info_gasto,
+            "estabilidad_ingresos": self._mostrar_info_estabilidad,
+        }
         for idx, (clave, texto) in enumerate(
             [
                 ("ratio_ahorro", "Ratio de Ahorro"),
@@ -568,31 +619,31 @@ class AsistenteFinancieroDifuso:
             fila.grid(row=idx, column=0, sticky="ew", pady=2)
             lbl = ttk.Label(fila, text=f"{texto}: --")
             lbl.pack(side="left")
-            if clave == "ratio_ahorro":
-                ttk.Button(
-                    fila,
-                    text="?",
-                    width=2,
-                    command=self._mostrar_info_ratio,
-                ).pack(side="left", padx=(6, 0))
+            if clave in info_map:
+                ttk.Button(fila, text="?", width=2, command=info_map[clave]).pack(
+                    side="left", padx=(6, 0)
+                )
             pb = ttk.Progressbar(fila, maximum=100, length=220)
             pb.pack(side="right", padx=5)
             self.metricas_widgets[clave] = (lbl, pb)
+        cont_categoria = ttk.Frame(tablero)
+        cont_categoria.grid(row=3, column=0, sticky="w", pady=(8, 2))
         self.lbl_categoria = ttk.Label(
-            tablero, text="Perfil pendiente", font=("Arial", 12, "bold")
+            cont_categoria, text="Perfil pendiente", font=("Arial", 12, "bold")
         )
-        self.lbl_categoria.grid(row=3, column=0, sticky="w", pady=(8, 2))
+        self.lbl_categoria.pack(side="left")
+        ttk.Button(
+            cont_categoria, text="?", width=2, command=self._mostrar_info_perfil
+        ).pack(side="left", padx=(6, 0))
         self.pb_recomendacion = ttk.Progressbar(tablero, maximum=100, length=320)
         self.pb_recomendacion.grid(row=4, column=0, sticky="ew")
-        ttk.Button(
-            frame, text="💾 Exportar código .txt", command=self._guardar_script_txt
-        ).pack(fill="x", pady=5)
         if plt is not None:
             btn_g = ttk.Button(frame, text="Ver gráficas", command=self._graficas_gui)
             btn_g.pack(fill="x", pady=5)
 
     def _accion_gui(self):
         r = self.obtener_recomendacion()
+        self.ultimo_resultado = r
         m = r["metricas"]
         reporte = (
             f"Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n"
@@ -609,17 +660,56 @@ class AsistenteFinancieroDifuso:
         self.txt.insert("1.0", reporte)
         self._actualizar_panel_metricas(m, r)
 
-    def _actualizar_panel_metricas(self, metricas, resultado):
-        if not hasattr(self, "metricas_widgets"):
-            return
-        for clave, (lbl, pb) in self.metricas_widgets.items():
-            val = metricas.get(clave, 0.0)
-            lbl.config(text=f"{lbl.cget('text').split(':')[0]}: {val:.1f}%")
-            pb["value"] = val
-        self.lbl_categoria.config(
-            text=f"Perfil {resultado['categoria']} · {resultado['valor']:.1f}"
+    def _mostrar_info_ratio(self):
+        mensaje = (
+            "Ratio de Ahorro = (Ahorro promedio / Ingreso promedio) * 100.\n"
+            "Un porcentaje alto implica holgura financiera y resiliencia ante emergencias."
         )
-        self.pb_recomendacion["value"] = resultado["valor"]
+        (
+            messagebox.showinfo("¿Qué es el Ratio de Ahorro?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_gasto(self):
+        mensaje = (
+            "Gasto Esencial % = (Gasto esencial / Ingreso promedio) * 100.\n"
+            "Describe cuánto de tus ingresos se dirige a necesidades básicas; "
+            "superar 60% suele limitar el ahorro."
+        )
+        (
+            messagebox.showinfo("¿Qué es el Gasto Esencial?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_estabilidad(self):
+        mensaje = (
+            "Estabilidad de Ingresos calcula la variación de tus ingresos recientes.\n"
+            "Valores cercanos a 100% significan ingresos consistentes; bajos implican volatilidad."
+        )
+        (
+            messagebox.showinfo("¿Qué es la Estabilidad de Ingresos?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_perfil(self):
+        if self.ultimo_resultado:
+            res = self.ultimo_resultado
+            mensaje = (
+                f"Perfil {res['categoria']} ({res['valor']:.1f}).\n"
+                f"Componente difuso: {res['valor_difuso']:.1f}\n"
+                f"Componente neuronal: {res['valor_neuronal']:.1f}\n\n"
+                f"{res['explicacion']}"
+            )
+        else:
+            mensaje = "Realiza un análisis primero para obtener tu perfil financiero."
+        (
+            messagebox.showinfo("Detalle del Perfil", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
 
     def calcular_metricas(self):
         datos = self.datos_financieros

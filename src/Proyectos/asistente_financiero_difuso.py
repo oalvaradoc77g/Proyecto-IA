@@ -108,6 +108,7 @@ class AsistenteFinancieroDifuso:
         elif isinstance(datos_externos, str) and os.path.exists(datos_externos):
             self.origen_datos = "CSV"
         self.neuro_modelo = None
+        self.ultimo_resultado = None
 
         # Validar disponibilidad de skfuzzy
         if fuzz is None or ctrl is None:
@@ -495,21 +496,49 @@ class AsistenteFinancieroDifuso:
         ttk.Label(
             main_frame, text=f"Fuente de datos: {self.origen_datos}", font=("Arial", 10)
         ).grid(row=1, column=0, columnspan=3, sticky="w")
-        self.lbl_estado = ttk.Label(
-            main_frame,
-            text="Score neuro-difuso pendiente",
-            font=("Arial", 12, "bold"),
-            foreground="#1c5d99",
-        )
-        self.lbl_estado.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(5, 0))
-        self.pb_estado = ttk.Progressbar(main_frame, maximum=100)
-        self.pb_estado.grid(row=3, column=0, columnspan=3, sticky="ew", pady=5)
-
+        info_map = {
+            "ratio_ahorro": self._mostrar_info_ratio,
+            "ratio_gasto_essencial": self._mostrar_info_gasto,
+            "estabilidad_ingresos": self._mostrar_info_estabilidad,
+        }
         frame_metricas = ttk.LabelFrame(
             main_frame, text="📊 Métricas Financieras", padding="10"
         )
         frame_metricas.grid(row=4, column=0, columnspan=3, sticky="ew", pady=10)
-        frame_metricas.columnconfigure(1, weight=1)
+        frame_metricas.columnconfigure(0, weight=1)
+
+        for idx, (clave, texto) in enumerate(
+            [
+                ("ratio_ahorro", "Ratio de Ahorro"),
+                ("ratio_gasto_essencial", "Gasto Esencial"),
+                ("estabilidad_ingresos", "Estabilidad Ingresos"),
+            ]
+        ):
+            fila = ttk.Frame(frame_metricas)
+            fila.grid(row=idx, column=0, sticky="ew", pady=3)
+            lbl = ttk.Label(fila, text=f"{texto}: --")
+            lbl.pack(side="left")
+            if clave in info_map:
+                ttk.Button(fila, text="?", width=2, command=info_map[clave]).pack(
+                    side="left", padx=(6, 0)
+                )
+            pb = ttk.Progressbar(fila, maximum=100, length=260)
+            pb.pack(side="right")
+            frame_metricas.columnconfigure(0, weight=1)
+        cont_estado = ttk.Frame(main_frame)
+        cont_estado.grid(row=3, column=0, columnspan=3, sticky="ew", pady=(5, 0))
+        self.lbl_estado = ttk.Label(
+            cont_estado,
+            text="Score neuro-difuso pendiente",
+            font=("Arial", 12, "bold"),
+            foreground="#1c5d99",
+        )
+        self.lbl_estado.pack(side="left")
+        ttk.Button(
+            cont_estado, text="?", width=2, command=self._mostrar_info_perfil
+        ).pack(side="left", padx=(6, 0))
+        self.pb_estado = ttk.Progressbar(main_frame, maximum=100)
+        self.pb_estado.grid(row=4, column=0, columnspan=3, sticky="ew", pady=5)
 
         self.texto_resultados = scrolledtext.ScrolledText(
             main_frame, width=80, height=20, font=("Consolas", 10), wrap=tk.WORD
@@ -541,6 +570,7 @@ class AsistenteFinancieroDifuso:
     # Mostrar análisis en GUI
     def _mostrar_analisis_gui(self):
         resultado = self.obtener_recomendacion()
+        self.ultimo_resultado = resultado
         if resultado:
             metricas = resultado["metricas"]
             reporte = (
@@ -667,3 +697,53 @@ class AsistenteFinancieroDifuso:
             f"Componentes -> Difuso: {resultado['valor_difuso']:.1f} | Neuronal: {resultado['valor_neuronal']:.1f}"
         )
         print("=" * 80)
+
+    def _mostrar_info_ratio(self):
+        mensaje = (
+            "Ratio de Ahorro = (Ahorro promedio / Ingreso promedio) * 100.\n"
+            "Mientras mayor sea, más margen tienes para invertir o cubrir emergencias."
+        )
+        (
+            messagebox.showinfo("¿Qué es el Ratio de Ahorro?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_gasto(self):
+        mensaje = (
+            "Gasto Esencial % refleja qué parte de tu ingreso se va a necesidades básicas.\n"
+            "Si supera ~60%, conviene revisar gastos para liberar ahorro."
+        )
+        (
+            messagebox.showinfo("¿Qué es el Gasto Esencial?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_estabilidad(self):
+        mensaje = (
+            "Estabilidad de Ingresos compara la variación de tus ingresos recientes.\n"
+            "Un valor cercano a 100% indica pagos constantes; bajo implica volatilidad."
+        )
+        (
+            messagebox.showinfo("¿Qué es la Estabilidad de Ingresos?", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
+
+    def _mostrar_info_perfil(self):
+        if self.ultimo_resultado:
+            res = self.ultimo_resultado
+            mensaje = (
+                f"Perfil {res['categoria']} ({res['valor']:.1f}).\n"
+                f"· Difuso: {res['valor_difuso']:.1f}\n"
+                f"· Neuronal: {res['valor_neuronal']:.1f}\n\n"
+                f"{res['explicacion']}"
+            )
+        else:
+            mensaje = "Ejecuta el análisis para conocer tu perfil financiero."
+        (
+            messagebox.showinfo("Detalle del Perfil", mensaje)
+            if messagebox
+            else print(mensaje)
+        )
