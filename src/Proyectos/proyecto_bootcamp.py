@@ -202,9 +202,10 @@ class MiniMLP:
             dz1 = da1 * self._relu_deriv(z1)
             # Gradiente para W1: Calcula cómo ajustar los pesos de la capa oculta
             grad_W1 = X.T @ dz1 / len(X)
+            # Gradiente para b1: Calcula cómo ajustar los sesgos de la capa oculta
             grad_b1 = dz1.mean(axis=0)
 
-            # ACTUALIZACIÓN DE PESOS
+            # Actualiza todos los pesos y sesgos usando los gradientes calculados y la tasa de aprendizaje
             self.W2 -= lr * grad_W2
             self.b2 -= lr * grad_b2
             self.W1 -= lr * grad_W1
