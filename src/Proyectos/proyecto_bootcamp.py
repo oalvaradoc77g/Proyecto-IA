@@ -1,4 +1,5 @@
 """
+Autor: Omar Alvarado Castillo
 Asistente Financiero con Lógica Difusa
 Archivo único: proyecto_bootcamp.py
 Objetivo: cargar Datos Movimientos Financieros.csv, procesar, calcular métricas y obtener
@@ -167,32 +168,49 @@ class MiniMLP:
         return 1.0 / (1.0 + np.exp(-x))
 
     # Entrenamiento con descenso de gradiente
-    # epochs es la cantidad de iteraciones para entrenar se deja 400 porque es un valor común para un entrenamiento rápido
-    # lr es la tasa de aprendizaje se deja 0.04 porque es un valor común para un entrenamiento rápido
+    # epochs es la cantidad de iteraciones para entrenar se deja 500 porque es un valor común para un entrenamiento rápido
+    # lr es la tasa de aprendizaje se deja 0.05 porque es un valor común para un entrenamiento rápido
     # X es la matriz de características de entrada
     # y es el vector de etiquetas o valores objetivo
     def entrenar(self, X, y, epochs=500, lr=0.05):
+        # Validación: Si no hay datos de entrada, termina la función inmediatamente
         if len(X) == 0:
             return
+        # Repite el proceso el número de veces especificado en epochs
         for _ in range(epochs):
+
+            # PROPAGACIÓN HACIA ADELANTE (Forward Pass)
+            # Capa oculta - entrada: Multiplica los datos de entrada por los pesos de la primera capa (W1) y suma los sesgos (b1)
             z1 = X @ self.W1 + self.b1
+            # Capa oculta - activación: Aplica la función de activación ReLU para introducir no-linealidad
             a1 = self._relu(z1)
+            # Capa de salida - entrada: Toma la salida de la capa oculta y la multiplica por los pesos de la segunda capa (W2) más sesgos
             z2 = a1 @ self.W2 + self.b2
+            # Predicción final: Aplica función sigmoide para obtener probabilidades (entre 0 y 1)
             y_pred = self._sigmoid(z2)
+            # Cálculo de error: Compara las predicciones con los valores reales
             error = y_pred - y
 
+            # PROPAGACIÓN HACIA ATRÁS (Backward Pass - cálculo de gradientes)
+            # Gradiente para W2: Calcula cómo ajustar los pesos de la capa de salida
             grad_W2 = a1.T @ error / len(X)
+            # Gradiente para b2: Calcula cómo ajustar los sesgos de la capa de salida
             grad_b2 = error.mean(axis=0)
+            # Error en la capa oculta: Propaga el error hacia atrás a través de la capa oculta
             da1 = error @ self.W2.T
+            # Gradiente para activaciones: Calcula el gradiente considerando la derivada de ReLU
             dz1 = da1 * self._relu_deriv(z1)
+            # Gradiente para W1: Calcula cómo ajustar los pesos de la capa oculta
             grad_W1 = X.T @ dz1 / len(X)
             grad_b1 = dz1.mean(axis=0)
 
+            # ACTUALIZACIÓN DE PESOS
             self.W2 -= lr * grad_W2
             self.b2 -= lr * grad_b2
             self.W1 -= lr * grad_W1
             self.b1 -= lr * grad_b1
 
+    # Predicción con el modelo entrenado
     def predecir(self, X):
         z1 = X @ self.W1 + self.b1
         a1 = self._relu(z1)
